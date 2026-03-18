@@ -17,6 +17,9 @@ const fs = require('fs')
 const path = require('path')
 const CryptoJS = require('crypto-js')
 
+// 用于存储上次同步成功时的 hash 值的文件名后缀
+const SYNC_HASH_FILENAME = '/tabby-sync-last-hash.json'
+
 export class SettingsHelperClass {
     private adapterHandler = {
         [CloudSyncSettingsData.values.WEBDAV]: WebDav,
@@ -342,6 +345,42 @@ export class SettingsHelperClass {
         }
 
         return false
+    }
+
+    /**
+     * 计算内容的 SHA256 哈希值
+     * Calculate SHA256 hash of content
+     */
+    calculateHash (content: string): string {
+        return CryptoJS.SHA256(content).toString()
+    }
+
+    /**
+     * 读取上次同步成功时保存的哈希值
+     * Read last synced hash from local storage
+     */
+    readLastSyncedHash (platform: PlatformService): string | null {
+        const filePath = path.dirname(platform.getConfigPath()) + SYNC_HASH_FILENAME
+        if (fs.existsSync(filePath)) {
+            try {
+                const content = fs.readFileSync(filePath, 'utf8')
+                const data = JSON.parse(content)
+                return data.lastSyncedHash || null
+            } catch (e) {
+                return null
+            }
+        }
+        return null
+    }
+
+    /**
+     * 保存同步成功后的哈希值到本地
+     * Save last synced hash to local storage
+     */
+    saveLastSyncedHash (platform: PlatformService, hash: string): void {
+        const filePath = path.dirname(platform.getConfigPath()) + SYNC_HASH_FILENAME
+        const data = JSON.stringify({ lastSyncedHash: hash })
+        fs.writeFileSync(filePath, data, 'utf8')
     }
 
     doDescryption (content: string): string {

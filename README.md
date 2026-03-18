@@ -45,6 +45,15 @@ This plugin is **FREE** of use under public license MIT.
 
 Keep tracking of version release change logs
 
+## [v1.6.10] - 2026-03-18
+
+### ✨ 功能 (Features)
+- 使用 SHA256 哈希三向对比重构 WebDAV 同步逻辑，彻底解决本地与服务器时间不一致导致的无限循环同步问题。
+
+### 🐛 修复 (Fixes)
+- 增加同步冲突机制：如果遇到本地和云端都被修改的情况，会在 WebDAV 服务器端备份带时间戳的文件（`_backup_XXX`），再进行本地配置覆盖操作。
+- 添加兼容性过渡保护：初次更新插件时如果未找到本地哈希记录（`lastSyncedHash`），将回退到 mtime 时间对比机制作为唯一一次向下兼容。
+
 ## [v1.6.9] - 2026-03-06
 
 ### 变更 (Changes)

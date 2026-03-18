@@ -97,6 +97,8 @@ export default class CloudSyncSettingsModule {
             logger.log('Config changed. Syncing local settings to cloud...')
             this.showLoaderIndicator()
             await SettingsHelper.syncLocalSettingsToCloud(this.platform, this.toast).then(() => {
+                // syncLocalSettingsToCloud 内部已经会更新 hash，无需额外操作
+                // hash is already updated inside syncLocalSettingsToCloud
                 this.hideLoaderIndicator()
             }).catch((err) => {
                 this.hideLoaderIndicator()
