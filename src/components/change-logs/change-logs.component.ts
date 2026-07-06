@@ -20,6 +20,13 @@ export class ChangeLogsComponent implements OnInit {
 
     entries: ChangelogEntry[] = [
         {
+            version: '1.2.5',
+            date: '2026-07-06',
+            items: [
+                { en: 'Fix Tabby startup crash (NG0202) from VaultService injection', zh: '修复注入 VaultService 导致 Tabby 启动失败（NG0202）' },
+            ],
+        },
+        {
             version: '1.2.4',
             date: '2026-07-06',
             items: [

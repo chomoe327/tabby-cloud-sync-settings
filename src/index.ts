@@ -1,5 +1,5 @@
 // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-import { NgModule } from '@angular/core'
+import { Injector, NgModule } from '@angular/core'
 import { SettingsTabProvider } from 'terminus-settings'
 import { SyncConfigSettingsTabProvider } from './settings'
 import { CommonModule } from '@angular/common'
@@ -76,13 +76,9 @@ export default class CloudSyncSettingsModule {
         private platform: PlatformService,
         private toast: ToastrService,
         private configService: ConfigService,
-        // VaultService is provided by Tabby core at runtime
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        private vaultService: any) {
+        private injector: Injector) {
         SettingsHelper.setConfigService(this.configService)
-        if (this.vaultService?.getPassphrase) {
-            SettingsHelper.setVaultService(this.vaultService)
-        }
+        this.initVaultService()
         this.injectLoaderIndicator()
         SettingsHelper.loadPluginSettings(this.platform)
         setTimeout(async () => {
@@ -94,6 +90,23 @@ export default class CloudSyncSettingsModule {
                 this.subscribeToAutoSyncEvent()
             })
         })
+    }
+
+    private initVaultService (): void {
+        setTimeout(() => {
+            try {
+                // eslint-disable-next-line @typescript-eslint/no-var-requires
+                const core = require('terminus-core')
+                const vaultService = core.VaultService
+                    ? this.injector.get(core.VaultService)
+                    : null
+                if (vaultService?.getPassphrase) {
+                    SettingsHelper.setVaultService(vaultService)
+                }
+            } catch {
+                // Vault is optional until encrypted config sync is needed
+            }
+        }, 0)
     }
 
     subscribeToAutoSyncEvent(): void {
