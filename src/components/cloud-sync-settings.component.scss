@@ -46,6 +46,45 @@
   opacity: 0.75;
 }
 
+.sync-vault-section {
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sync-vault-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.sync-vault-label {
+  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+}
+
+.sync-vault-summary,
+.sync-vault-scope {
+  line-height: 1.4;
+}
+
+.sync-vault-scope {
+  margin-top: 0.35rem;
+}
+
+.sync-vault-details {
+  margin-top: 0.5rem;
+
+  summary {
+    cursor: pointer;
+    font-size: 0.85rem;
+    opacity: 0.8;
+    margin-bottom: 0.35rem;
+  }
+}
+
 .custom-mode-actions {
   margin-top: 1rem;
   padding-top: 1rem;

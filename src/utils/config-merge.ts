@@ -22,6 +22,8 @@ export interface SyncOptions {
     ignoreEnabled?: boolean
     syncMode?: SyncMode
     syncFields?: Record<string, boolean>
+    /** Sync Tabby Vault secrets (SSH passwords, etc.) */
+    syncVault?: boolean
     /** @deprecated use syncFields */
     syncSections?: Record<string, boolean>
 }
@@ -181,16 +183,21 @@ export function resolveSyncOptions (saved: any, override: SyncOptions = {}): Syn
     return {
         syncMode,
         syncFields,
+        syncVault: override.syncVault ?? saved?.syncVault ?? false,
         ignoreEnabled: override.ignoreEnabled ?? false,
     }
 }
 
-function parseYaml (content: string): Record<string, any> {
+export function parseConfigYaml (content: string): Record<string, any> {
     if (!content || !content.trim()) {
         return {}
     }
     const parsed = yaml.load(content)
     return parsed && typeof parsed === 'object' ? parsed as Record<string, any> : {}
+}
+
+export function isEncryptedConfig (obj: Record<string, any>): boolean {
+    return !!obj.encrypted
 }
 
 function getValueAtPath (obj: Record<string, any>, path: string): any {
@@ -244,47 +251,32 @@ function applyFieldFromSource (target: Record<string, any>, source: Record<strin
     }
 }
 
-function applyFieldsFromSource (target: Record<string, any>, source: Record<string, any>, options: SyncOptions): void {
+export function applyFieldsFromSource (target: Record<string, any>, source: Record<string, any>, options: SyncOptions): void {
     for (const field of getActiveFieldDefs(options)) {
         applyFieldFromSource(target, source, field.path)
     }
 }
 
-export function mergeForDownload (localRaw: string, remoteRaw: string, options: SyncOptions): string {
+export function buildCanonicalPayloadFromData (data: Record<string, any>, options: SyncOptions, secrets?: any[]): string {
     if (options.syncMode === 'full') {
-        return remoteRaw
+        return JSON.stringify(data)
     }
 
-    const localObj = parseYaml(localRaw)
-    const remoteObj = parseYaml(remoteRaw)
-    const merged = { ...localObj }
-    applyFieldsFromSource(merged, remoteObj, options)
-    return yaml.dump(merged, { lineWidth: -1, noRefs: true })
-}
+    const payload: Record<string, any> = {}
+    const fields = getActiveFieldDefs(options).slice().sort((a, b) => a.id.localeCompare(b.id))
 
-export function mergeForUpload (localRaw: string, remoteRaw: string | null, options: SyncOptions): string {
-    if (options.syncMode === 'full') {
-        return localRaw
-    }
-
-    const localObj = parseYaml(localRaw)
-    const remoteObj = remoteRaw ? parseYaml(remoteRaw) : {}
-    const merged = { ...remoteObj }
-    applyFieldsFromSource(merged, localObj, options)
-
-    if (!remoteRaw) {
-        for (const key of Object.keys(localObj)) {
-            const touchedByField = getActiveFieldDefs(options).some(field => {
-                const topLevel = field.path.split('.')[0]
-                return topLevel === key
-            })
-            if (!touchedByField && !Object.prototype.hasOwnProperty.call(merged, key)) {
-                merged[key] = localObj[key]
-            }
+    for (const field of fields) {
+        const value = getValueAtPath(data, field.path)
+        if (value !== undefined) {
+            payload[field.id] = value
         }
     }
 
-    return yaml.dump(merged, { lineWidth: -1, noRefs: true })
+    if (options.syncVault && secrets?.length) {
+        payload.__secrets = secrets
+    }
+
+    return JSON.stringify(payload)
 }
 
 export function buildCanonicalSyncPayload (yamlRaw: string, options: SyncOptions): string {
@@ -292,16 +284,6 @@ export function buildCanonicalSyncPayload (yamlRaw: string, options: SyncOptions
         return yamlRaw
     }
 
-    const obj = parseYaml(yamlRaw)
-    const payload: Record<string, any> = {}
-    const fields = getActiveFieldDefs(options).slice().sort((a, b) => a.id.localeCompare(b.id))
-
-    for (const field of fields) {
-        const value = getValueAtPath(obj, field.path)
-        if (value !== undefined) {
-            payload[field.id] = value
-        }
-    }
-
-    return JSON.stringify(payload)
+    const obj = parseConfigYaml(yamlRaw)
+    return buildCanonicalPayloadFromData(obj, options)
 }

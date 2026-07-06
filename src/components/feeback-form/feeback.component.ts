@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core'
-import axios from 'axios'
-import CloudSyncSettingsData from "../../data/setting-items";
+import { ConfigService, PlatformService } from 'terminus-core'
+import Lang from '../../data/lang'
+import { github_url } from '../../../package.json'
 
 @Component({
     selector: 'cloud-sync-feedback-form',
@@ -8,124 +9,19 @@ import CloudSyncSettingsData from "../../data/setting-items";
     styles: [require('./feedback.component.scss')],
 })
 export class CloudSyncFeedbackComponent implements OnInit {
-    requestUrl = CloudSyncSettingsData.external_urls.ApiUrl + '/submit-feedback'
-    requestSubscribeUrl = 'https:/' + CloudSyncSettingsData.external_urls.ApiUrl + '/subscribe-newsletter'
-    isFormProcessing = false
-    isFormSubscribeProcessing = false
-    form_messages = {
-        errors: [],
-        success: [],
-    }
-    form_subscribe_messages = {
-        errors: [],
-        success: [],
-    }
-    form = {
-        subject: '',
-        name: '',
-        email: '',
-        message: '',
+    translate = Lang
+    issuesUrl = github_url + '/issues'
 
-    }
-    newLetterForm = {
-        email: '',
-    }
-
-    calculationGenerateObj = {
-        left: 0,
-        right: 0,
-        answer: '',
-        correctedAnswer: '',
-    }
+    constructor (
+        private platform: PlatformService,
+        private config: ConfigService,
+    ) {}
 
     ngOnInit (): void {
-        this.setCaptchaCalculation()
+        Lang.refreshLocale(this.platform, this.config)
     }
 
-    setCaptchaCalculation (): void {
-        this.calculationGenerateObj.left = Math.floor(Math.random() * 99)
-        this.calculationGenerateObj.right = Math.floor(Math.random() * 99)
-        this.calculationGenerateObj.correctedAnswer = (this.calculationGenerateObj.left + this.calculationGenerateObj.right).toString()
-        this.calculationGenerateObj.answer = ''
-    }
-
-    resetForm (): void {
-        this.form = {
-            subject: '',
-            name: '',
-            email: '',
-            message: '',
-        }
-        this.newLetterForm = {
-            email: '',
-        }
-        this.setCaptchaCalculation()
-    }
-    resetFormMessages (): void {
-        this.form_messages.errors = []
-        this.form_messages.success = []
-        this.form_subscribe_messages.errors = []
-        this.form_subscribe_messages.success = []
-    }
-
-    async subscribeNewsletter (): Promise<void> {
-        this.resetFormMessages()
-        if (!this.newLetterForm.email) {
-            this.form_subscribe_messages.errors.push('Please enter your email')
-            return
-        }
-
-        this.isFormSubscribeProcessing = true
-        const bodyFormData = new FormData()
-        bodyFormData.append('email', this.newLetterForm.email)
-        await axios.post(this.requestSubscribeUrl, bodyFormData, {
-            timeout: 30000,
-        }).then((data) => {
-            this.isFormSubscribeProcessing = false
-            if (data.data.status) {
-                this.form_subscribe_messages.success.push(data.data.message)
-                this.resetForm()
-                this.setCaptchaCalculation()
-            } else {
-                this.form_subscribe_messages.errors.push(data.data.message)
-            }
-        }).catch(e => {
-            this.isFormSubscribeProcessing = false
-            this.form_subscribe_messages.errors.push(e.message)
-        })
-    }
-
-    async submitFeedback (): Promise<void> {
-        this.resetFormMessages()
-        if (!this.form.subject || !this.form.name || !this.form.email || !this.form.message) {
-            this.form_messages.errors.push('Please fill all fields')
-            return
-        }
-        if (this.calculationGenerateObj.answer !== this.calculationGenerateObj.correctedAnswer) {
-            this.form_messages.errors.push('Please solve the correct calculation')
-            return
-        }
-
-        this.isFormProcessing = true
-        const bodyFormData = new FormData()
-        bodyFormData.append('subject', this.form.subject)
-        bodyFormData.append('name', this.form.name)
-        bodyFormData.append('email', this.form.email)
-        bodyFormData.append('message', this.form.message)
-        await axios.post(this.requestUrl, bodyFormData, {
-            timeout: 30000,
-        }).then((data) => {
-            this.isFormProcessing = false
-            if (data.data.status) {
-                this.form_messages.success.push(data.data.message)
-                this.resetForm()
-                this.setCaptchaCalculation()
-            } else {
-                this.form_messages.errors.push(data.data.message)
-            }
-        }).catch(e => {
-            this.isFormProcessing = false
-            this.form_messages.errors.push(e.message)
-        })
+    openIssues (): void {
+        this.platform.openExternal(this.issuesUrl)
     }
 }

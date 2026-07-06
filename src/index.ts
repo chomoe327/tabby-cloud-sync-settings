@@ -19,7 +19,6 @@ import { CloudSyncGistSettingsComponent } from './components/sub-components/gist
 import { CloudSyncFeedbackComponent } from './components/feeback-form/feeback.component'
 import { MasterPasswordComponent } from './components/master-password/master-password.component'
 import { ChangeLogsComponent } from './components/change-logs/change-logs.component'
-import { SupportUsComponent } from './components/support-us/support-us.component'
 import CloudSyncSettingsData from './data/setting-items'
 import { CheckForUpdatesComponent } from './components/sub-components/check-for-updates/check-for-updates.component'
 import { CloudSyncDropboxSettingsComponent } from "./components/sub-components/dropbox/dropbox-settings.component";
@@ -62,7 +61,6 @@ let initAutoSynIntervalFrequency = CloudSyncSettingsData.defaultSyncInterval * 1
         CloudSyncFeedbackComponent,
         MasterPasswordComponent,
         ChangeLogsComponent,
-        SupportUsComponent,
         CheckForUpdatesComponent,
         PluginLogsComponent,
         ToggleComponent,
@@ -77,7 +75,14 @@ export default class CloudSyncSettingsModule {
     constructor(private app: AppService,
         private platform: PlatformService,
         private toast: ToastrService,
-        private configService: ConfigService) {
+        private configService: ConfigService,
+        // VaultService is provided by Tabby core at runtime
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        private vaultService: any) {
+        SettingsHelper.setConfigService(this.configService)
+        if (this.vaultService?.getPassphrase) {
+            SettingsHelper.setVaultService(this.vaultService)
+        }
         this.injectLoaderIndicator()
         SettingsHelper.loadPluginSettings(this.platform)
         setTimeout(async () => {

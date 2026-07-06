@@ -101,10 +101,11 @@ class AmazonS3Class {
             remoteFile = this.path + CloudSyncSettingsData.cloudSettingsFilename
         }
 
+        const uploadBody = await SettingsHelper.prepareConfigForUpload(platform, null, options)
         const uploadObjectParams = {
             Bucket: this.bucket,
             Key: remoteFile,
-            Body: SettingsHelper.prepareConfigForUpload(platform, null, options),
+            Body: uploadBody,
             ACL: this.PERMISSIONS.PRIVATE,
             ContentType: 'application/json',
         }
@@ -131,7 +132,7 @@ class AmazonS3Class {
                         } else {
                             if (SettingsHelper.verifyServerConfigIsValid(content)) {
                                 await SettingsHelper.backupTabbyConfigFile(platform)
-                                SettingsHelper.applyConfigFromCloud(config, platform, SettingsHelper.doDescryption(content), options)
+                                await SettingsHelper.applyConfigFromCloud(config, platform, SettingsHelper.doDescryption(content), options)
                                 result['result'] = true
                             } else {
                                 result['result'] = false
@@ -140,28 +141,23 @@ class AmazonS3Class {
                         }
                     } else {
                         const filePath = path.dirname(platform.getConfigPath()) + CloudSyncSettingsData.tabbySettingsFilename
-                        let localFileUpdatedAt = null
-                        // eslint-disable-next-line @typescript-eslint/await-thenable,@typescript-eslint/no-confusing-void-expression
-                        await fs.stat(filePath, (err, stats) => {
-                            //Checking for errors
-                            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-                            if (err){
-                                logger.log(err)
-                            } else {
-                                localFileUpdatedAt = moment(stats.mtime)
-                                logger.log('Auto Sync Amazon AWS')
-                                logger.log('Server Updated At ' + (remoteSyncConfigUpdatedAt ? remoteSyncConfigUpdatedAt.format('YYYY-MM-DD HH:mm:ss') : null))
-                                logger.log('Local Updated At '+ localFileUpdatedAt.format('YYYY-MM-DD HH:mm:ss'))
+                        try {
+                            const stats = fs.statSync(filePath)
+                            const localFileUpdatedAt = moment(stats.mtime)
+                            logger.log('Auto Sync Amazon AWS')
+                            logger.log('Server Updated At ' + (remoteSyncConfigUpdatedAt ? remoteSyncConfigUpdatedAt.format('YYYY-MM-DD HH:mm:ss') : null))
+                            logger.log('Local Updated At '+ localFileUpdatedAt.format('YYYY-MM-DD HH:mm:ss'))
 
-                                if (remoteSyncConfigUpdatedAt && remoteSyncConfigUpdatedAt > localFileUpdatedAt) {
-                                    logger.log('Sync direction: Cloud to local.')
-                                    SettingsHelper.applyConfigFromCloud(config, platform, SettingsHelper.doDescryption(content), options)
-                                } else {
-                                    logger.log('Sync direction: Local To Cloud.')
-                                    this.syncLocalSettingsToCloud(platform, toast, options)
-                                }
+                            if (remoteSyncConfigUpdatedAt && remoteSyncConfigUpdatedAt > localFileUpdatedAt) {
+                                logger.log('Sync direction: Cloud to local.')
+                                await SettingsHelper.applyConfigFromCloud(config, platform, SettingsHelper.doDescryption(content), options)
+                            } else {
+                                logger.log('Sync direction: Local To Cloud.')
+                                await this.syncLocalSettingsToCloud(platform, toast, options)
                             }
-                        })
+                        } catch (err) {
+                            logger.log(err)
+                        }
 
                         result['result'] = true
                     }
@@ -225,10 +221,11 @@ class AmazonS3Class {
             }
 
             let response: any = {}
+            const uploadBody = await SettingsHelper.prepareConfigForUpload(platform, remoteDecrypted, options)
             const uploadObjectParams = {
                 Bucket: this.bucket,
                 Key: remoteFile,
-                Body: SettingsHelper.prepareConfigForUpload(platform, remoteDecrypted, options),
+                Body: uploadBody,
                 ACL: this.PERMISSIONS.PRIVATE,
                 ContentType: 'application/json',
             }

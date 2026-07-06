@@ -84,10 +84,10 @@ class Gitee extends Gist {
                 })).response === 1) {
                     result = await this.syncLocalSettingsToCloud(platform, toast, gistFiles, options)
                 } else {
-                    SettingsHelper.applyConfigFromCloud(config, platform, SettingsHelper.doDescryption(serverTabbyContent), options)
+                    await SettingsHelper.applyConfigFromCloud(config, platform, SettingsHelper.doDescryption(serverTabbyContent), options)
                 }
             } else {
-                SettingsHelper.applyConfigFromCloud(config, platform, SettingsHelper.doDescryption(serverTabbyContent), options)
+                await SettingsHelper.applyConfigFromCloud(config, platform, SettingsHelper.doDescryption(serverTabbyContent), options)
             }
         } else {
             result = false
@@ -137,7 +137,7 @@ class Gitee extends Gist {
                         break
                     }
                 }
-                const localSettingContent = SettingsHelper.prepareConfigForUpload(platform, remoteDecrypted, options)
+                const localSettingContent = await SettingsHelper.prepareConfigForUpload(platform, remoteDecrypted, options)
                 const gitFileParams = {}
                 for (const idx in gistFiles) {
                     gitFileParams[idx] = {

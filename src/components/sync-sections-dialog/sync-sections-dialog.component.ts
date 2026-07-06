@@ -1,6 +1,6 @@
 import { Component, Input, OnInit } from '@angular/core'
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap'
-import { PlatformService } from 'terminus-core'
+import { ConfigService, PlatformService } from 'terminus-core'
 import Lang from '../../data/lang'
 import { SYNC_FIELD_GROUPS, SyncMode, getDefaultSyncFields, getFieldsByGroup, getGroupLabel, getFieldLabel, countEnabledSyncFields, SYNC_FIELDS } from '../../utils/config-merge'
 import { CustomSyncFieldsDialogService } from '../../services/custom-sync-fields-dialog.service'
@@ -23,11 +23,12 @@ export class SyncSectionsDialogComponent implements OnInit {
     constructor (
         public activeModal: NgbActiveModal,
         public platform: PlatformService,
+        private config: ConfigService,
         private customFieldsDialog: CustomSyncFieldsDialogService,
     ) {}
 
     ngOnInit (): void {
-        Lang.refreshLocale(this.platform)
+        Lang.refreshLocale(this.platform, this.config)
     }
 
     onSyncModeChange (mode: SyncMode): void {

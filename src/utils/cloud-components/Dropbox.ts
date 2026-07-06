@@ -75,7 +75,7 @@ class DropboxSync {
                             logger.log('First init. Sync direction: Cloud To Local.')
                             if (SettingsHelper.verifyServerConfigIsValid(content)) {
                                 await SettingsHelper.backupTabbyConfigFile(platform)
-                                SettingsHelper.applyConfigFromCloud(config, platform, SettingsHelper.doDescryption(content), options)
+                                await SettingsHelper.applyConfigFromCloud(config, platform, SettingsHelper.doDescryption(content), options)
                                 this._emitter?.emit({
                                     action: this.emitterActions.syncComplete,
                                     result: true,
@@ -95,28 +95,24 @@ class DropboxSync {
                         }
                     } else {
                         const filePath = path.dirname(platform.getConfigPath()) + CloudSyncSettingsData.tabbySettingsFilename
-                        let localFileUpdatedAt = null
-                        // eslint-disable-next-line @typescript-eslint/await-thenable,@typescript-eslint/no-confusing-void-expression
-                        fs.stat(filePath, (err, stats: any) => {
-                            //Checking for errors
-                            if (err) {
-                                logger.log(err)
+                        try {
+                            const stats = fs.statSync(filePath)
+                            const localFileUpdatedAt = moment(stats.mtime)
+
+                            logger.log('Auto Sync Dropbox')
+                            logger.log('Server Updated At ' + (remoteSyncConfigUpdatedAt ? remoteSyncConfigUpdatedAt.format('YYYY-MM-DD HH:mm:ss') : null))
+                            logger.log('Local Updated At ' + localFileUpdatedAt.format('YYYY-MM-DD HH:mm:ss'))
+
+                            if (remoteSyncConfigUpdatedAt && remoteSyncConfigUpdatedAt > localFileUpdatedAt) {
+                                logger.log('Sync direction: Cloud to local.')
+                                await SettingsHelper.applyConfigFromCloud(config, platform, SettingsHelper.doDescryption(content), options)
                             } else {
-                                localFileUpdatedAt = moment(stats.mtime)
-
-                                logger.log('Auto Sync Dropbox')
-                                logger.log('Server Updated At ' + (remoteSyncConfigUpdatedAt ? remoteSyncConfigUpdatedAt.format('YYYY-MM-DD HH:mm:ss') : null))
-                                logger.log('Local Updated At ' + localFileUpdatedAt.format('YYYY-MM-DD HH:mm:ss'))
-
-                                if (remoteSyncConfigUpdatedAt && remoteSyncConfigUpdatedAt > localFileUpdatedAt) {
-                                    logger.log('Sync direction: Cloud to local.')
-                                    SettingsHelper.applyConfigFromCloud(config, platform, SettingsHelper.doDescryption(content), options)
-                                } else {
-                                    logger.log('Sync direction: Local To Cloud.')
-                                    this.syncLocalSettingsToCloud(platform, toast, options)
-                                }
+                                logger.log('Sync direction: Local To Cloud.')
+                                await this.syncLocalSettingsToCloud(platform, toast, options)
                             }
-                        })
+                        } catch (err) {
+                            logger.log(err)
+                        }
                         result['result'] = true
                     }
                 })
@@ -231,7 +227,7 @@ class DropboxSync {
                     logger.log('Remote Dropbox file not found for merge upload.')
                 }
 
-                const uploadPayload = SettingsHelper.prepareConfigForUpload(platform, remoteDecrypted, options)
+                const uploadPayload = await SettingsHelper.prepareConfigForUpload(platform, remoteDecrypted, options)
                 dbx.filesUpload({ path: remoteFile, contents: uploadPayload, mode: 'overwrite' as any })
                     .then(async (response: any) => {
                         logger.log('Dropbox file upload success');

@@ -100,7 +100,7 @@ class Github extends Gist {
                 } else {
                     if (SettingsHelper.verifyServerConfigIsValid(serverTabbyContent)) {
                         await SettingsHelper.backupTabbyConfigFile(platform)
-                        SettingsHelper.applyConfigFromCloud(config, platform, SettingsHelper.doDescryption(serverTabbyContent), options)
+                        await SettingsHelper.applyConfigFromCloud(config, platform, SettingsHelper.doDescryption(serverTabbyContent), options)
                         return true
                     } else {
                         result['result'] = false
@@ -109,26 +109,23 @@ class Github extends Gist {
                 }
             } else {
                 const filePath = path.dirname(platform.getConfigPath()) + CloudSyncSettingsData.tabbySettingsFilename
-                let localFileUpdatedAt = null
-                await fs.stat(filePath, (err, stats) => {
-                    //Checking for errors
-                    if (err){
-                        logger.log(err)
-                    } else {
-                        localFileUpdatedAt = moment(stats.mtime)
-                        logger.log('Auto Sync GitHub Gist')
-                        logger.log('Server Updated At ' + (remoteSyncConfigUpdatedAt ? remoteSyncConfigUpdatedAt.format('YYYY-MM-DD HH:mm:ss') : null))
-                        logger.log('Local Updated At '+ localFileUpdatedAt.format('YYYY-MM-DD HH:mm:ss'))
+                try {
+                    const stats = fs.statSync(filePath)
+                    const localFileUpdatedAt = moment(stats.mtime)
+                    logger.log('Auto Sync GitHub Gist')
+                    logger.log('Server Updated At ' + (remoteSyncConfigUpdatedAt ? remoteSyncConfigUpdatedAt.format('YYYY-MM-DD HH:mm:ss') : null))
+                    logger.log('Local Updated At '+ localFileUpdatedAt.format('YYYY-MM-DD HH:mm:ss'))
 
-                        if (remoteSyncConfigUpdatedAt && remoteSyncConfigUpdatedAt > localFileUpdatedAt) {
-                            logger.log('Sync direction: Cloud to local.')
-                            SettingsHelper.applyConfigFromCloud(config, platform, SettingsHelper.doDescryption(serverTabbyContent), options)
-                        } else {
-                            logger.log('Sync direction: Local To Cloud.')
-                            this.syncLocalSettingsToCloud(platform, toast, gistFiles, options)
-                        }
+                    if (remoteSyncConfigUpdatedAt && remoteSyncConfigUpdatedAt > localFileUpdatedAt) {
+                        logger.log('Sync direction: Cloud to local.')
+                        await SettingsHelper.applyConfigFromCloud(config, platform, SettingsHelper.doDescryption(serverTabbyContent), options)
+                    } else {
+                        logger.log('Sync direction: Local To Cloud.')
+                        await this.syncLocalSettingsToCloud(platform, toast, gistFiles, options)
                     }
-                })
+                } catch (err) {
+                    logger.log(err)
+                }
                 return true
             }
         } else {
@@ -179,7 +176,7 @@ class Github extends Gist {
                         break
                     }
                 }
-                const localSettingContent = SettingsHelper.prepareConfigForUpload(platform, remoteDecrypted, options)
+                const localSettingContent = await SettingsHelper.prepareConfigForUpload(platform, remoteDecrypted, options)
                 const gitFileParams = {}
                 for (const idx in gistFiles) {
                     gitFileParams[idx] = {

@@ -211,6 +211,22 @@ h3([textContent]='translate.trans("settings.title")')
                                     span {{ translate.trans('sync.configure_custom_items') }}
                                 p.text-muted.small.mt-2.mb-0 {{ getCustomFieldsSummary() }}
 
+                            .alert.alert-warning.mt-4(*ngIf='isEncryptedConfig')
+                                i.fas.fa-fw.fa-lock.mr-2
+                                span {{ translate.trans('sync.encrypted_config_warning') }}
+
+                            .sync-vault-section.mt-4
+                                .sync-vault-row
+                                    .sync-vault-label
+                                        i.fas.fa-fw.fa-shield-alt.mr-2
+                                        span {{ translate.trans('sync.sync_vault_title') }}
+                                    toggle([(ngModel)]='syncVault')
+                                p.text-muted.small.sync-vault-summary.mb-1 {{ translate.trans('sync.sync_vault_hint_short') }}
+                                p.text-muted.small.sync-vault-scope.mb-0 {{ translate.trans('sync.sync_vault_scope_note') }}
+                                details.sync-vault-details(*ngIf='syncVault')
+                                    summary {{ translate.trans('common.details') }}
+                                    p.text-muted.small.mb-0 {{ translate.trans('sync.sync_vault_details') }}
+
                             button.btn.btn-primary.mt-4((click)='saveSyncSectionSettings()')
                                 i.fas.fa-fw.fa-save.mr-2
                                 span {{ translate.trans('sync.save_sync_settings') }}
@@ -219,11 +235,6 @@ h3([textContent]='translate.trans("settings.title")')
                 a(ngbNavLink) {{ translate.trans('tabs.feedback') }}
                 ng-template(ngbNavContent)
                     cloud-sync-feedback-form
-
-            li(ngbNavItem)
-                a(ngbNavLink) {{ translate.trans('tabs.support_us') }}
-                ng-template(ngbNavContent)
-                    support-us-cloud-sync
 
             li(ngbNavItem)
                 a(ngbNavLink) {{ translate.trans('tabs.change_logs') }}

@@ -46,7 +46,7 @@ class FTP {
                         } else {
                             if (SettingsHelper.verifyServerConfigIsValid(content)) {
                                 await SettingsHelper.backupTabbyConfigFile(platform)
-                                SettingsHelper.applyConfigFromCloud(config, platform, SettingsHelper.doDescryption(content), options)
+                                await SettingsHelper.applyConfigFromCloud(config, platform, SettingsHelper.doDescryption(content), options)
                                 result['result'] = true
                             } else {
                                 result['result'] = false
@@ -58,28 +58,23 @@ class FTP {
                             remoteSyncConfigUpdatedAt = moment(mTime)
 
                             const filePath = path.dirname(platform.getConfigPath()) + CloudSyncSettingsData.tabbySettingsFilename
-                            let localFileUpdatedAt = null
-                            // eslint-disable-next-line @typescript-eslint/await-thenable,@typescript-eslint/no-confusing-void-expression
-                            await fs.stat(filePath, (err, stats) => {
-                                //Checking for errors
-                                // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-                                if (err){
-                                    logger.log(err)
-                                } else {
-                                    localFileUpdatedAt = moment(stats.mtime)
-                                    logger.log('Auto Sync FTP')
-                                    logger.log('Server Updated At ' + (remoteSyncConfigUpdatedAt ? remoteSyncConfigUpdatedAt.format('YYYY-MM-DD HH:mm:ss') : null))
-                                    logger.log('Local Updated At '+ localFileUpdatedAt.format('YYYY-MM-DD HH:mm:ss'))
+                            try {
+                                const stats = fs.statSync(filePath)
+                                const localFileUpdatedAt = moment(stats.mtime)
+                                logger.log('Auto Sync FTP')
+                                logger.log('Server Updated At ' + (remoteSyncConfigUpdatedAt ? remoteSyncConfigUpdatedAt.format('YYYY-MM-DD HH:mm:ss') : null))
+                                logger.log('Local Updated At '+ localFileUpdatedAt.format('YYYY-MM-DD HH:mm:ss'))
 
-                                    if (remoteSyncConfigUpdatedAt && remoteSyncConfigUpdatedAt > localFileUpdatedAt) {
-                                        logger.log('Sync direction: Cloud to local.')
-                                        SettingsHelper.applyConfigFromCloud(config, platform, SettingsHelper.doDescryption(content), options)
-                                    } else {
-                                        logger.log('Sync direction: Local To Cloud.')
-                                        this.uploadLocalSettings(params, client, platform, toast, options)
-                                    }
+                                if (remoteSyncConfigUpdatedAt && remoteSyncConfigUpdatedAt > localFileUpdatedAt) {
+                                    logger.log('Sync direction: Cloud to local.')
+                                    await SettingsHelper.applyConfigFromCloud(config, platform, SettingsHelper.doDescryption(content), options)
+                                } else {
+                                    logger.log('Sync direction: Local To Cloud.')
+                                    await this.uploadLocalSettings(params, client, platform, toast, options)
                                 }
-                            })
+                            } catch (err) {
+                                logger.log(err)
+                            }
                             result['result'] = true
                         })
                     }

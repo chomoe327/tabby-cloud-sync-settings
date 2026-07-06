@@ -106,7 +106,7 @@ class Gitlab extends Gist {
                 } else {
                     if (SettingsHelper.verifyServerConfigIsValid(serverTabbyContent)) {
                         await SettingsHelper.backupTabbyConfigFile(platform)
-                        SettingsHelper.applyConfigFromCloud(config, platform, SettingsHelper.doDescryption(serverTabbyContent), options)
+                        await SettingsHelper.applyConfigFromCloud(config, platform, SettingsHelper.doDescryption(serverTabbyContent), options)
                         return true
                     } else {
                         result['result'] = false
@@ -115,26 +115,23 @@ class Gitlab extends Gist {
                 }
             } else {
                 const filePath = path.dirname(platform.getConfigPath()) + CloudSyncSettingsData.tabbySettingsFilename
-                let localFileUpdatedAt = null
-                await fs.stat(filePath, (err, stats) => {
-                    //Checking for errors
-                    if (err){
-                        logger.log(err)
-                    } else {
-                        localFileUpdatedAt = moment(stats.mtime)
-                        logger.log('Auto Sync GitLab Gist')
-                        logger.log('Server Updated At ' + (remoteSyncConfigUpdatedAt ? remoteSyncConfigUpdatedAt.format('YYYY-MM-DD HH:mm:ss') : null ))
-                        logger.log('Local Updated At '+ localFileUpdatedAt.format('YYYY-MM-DD HH:mm:ss'))
+                try {
+                    const stats = fs.statSync(filePath)
+                    const localFileUpdatedAt = moment(stats.mtime)
+                    logger.log('Auto Sync GitLab Gist')
+                    logger.log('Server Updated At ' + (remoteSyncConfigUpdatedAt ? remoteSyncConfigUpdatedAt.format('YYYY-MM-DD HH:mm:ss') : null ))
+                    logger.log('Local Updated At '+ localFileUpdatedAt.format('YYYY-MM-DD HH:mm:ss'))
 
-                        if (remoteSyncConfigUpdatedAt && remoteSyncConfigUpdatedAt > localFileUpdatedAt) {
-                            logger.log('Sync direction: Cloud to local.')
-                            SettingsHelper.applyConfigFromCloud(config, platform, SettingsHelper.doDescryption(serverTabbyContent), options)
-                        } else {
-                            logger.log('Sync direction: Local To Cloud.')
-                            this.syncLocalSettingsToCloud(platform, toast, options)
-                        }
+                    if (remoteSyncConfigUpdatedAt && remoteSyncConfigUpdatedAt > localFileUpdatedAt) {
+                        logger.log('Sync direction: Cloud to local.')
+                        await SettingsHelper.applyConfigFromCloud(config, platform, SettingsHelper.doDescryption(serverTabbyContent), options)
+                    } else {
+                        logger.log('Sync direction: Local To Cloud.')
+                        await this.syncLocalSettingsToCloud(platform, toast, options)
                     }
-                })
+                } catch (err) {
+                    logger.log(err)
+                }
                 return true
             }
         } else {
@@ -170,7 +167,7 @@ class Gitlab extends Gist {
                 logger.log('Remote GitLab snippet not found for merge upload.')
             }
 
-            const localSettingContent = SettingsHelper.prepareConfigForUpload(platform, remoteDecrypted, options)
+            const localSettingContent = await SettingsHelper.prepareConfigForUpload(platform, remoteDecrypted, options)
 
             result = await axios.put(`${component.baseRequestUrl}/${component.id}`, {
                 gist_id: component.id,

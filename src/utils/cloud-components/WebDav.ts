@@ -43,8 +43,8 @@ class WebDav {
                                 if (SettingsHelper.verifyServerConfigIsValid(content)) {
                                     await SettingsHelper.backupTabbyConfigFile(platform)
                                     const decryptedContent = SettingsHelper.doDescryption(content)
-                                    const merged = SettingsHelper.applyConfigFromCloud(config, platform, decryptedContent, options)
-                                    SettingsHelper.saveLastSyncedHash(platform, SettingsHelper.calculateSyncHash(merged, options))
+                                    const merged = await SettingsHelper.applyConfigFromCloud(config, platform, decryptedContent, options)
+                                    SettingsHelper.saveLastSyncedHash(platform, await SettingsHelper.calculateSyncHash(merged, options))
                                     result['result'] = true
                                 } else {
                                     result['result'] = false
@@ -55,11 +55,11 @@ class WebDav {
                             logger.log('Auto Sync WebDav (Hash-based)')
                             logger.log('Remote file: ' + remoteFile)
 
-                            const localRaw = SettingsHelper.readTabbyConfigFile(platform, true, false)
+                            const localRaw = SettingsHelper.getLocalConfigRaw(undefined, platform)
                             const remoteDecrypted = SettingsHelper.doDescryption(content)
 
-                            const localHash = SettingsHelper.calculateSyncHash(localRaw, options)
-                            const remoteHash = SettingsHelper.calculateSyncHash(remoteDecrypted, options)
+                            const localHash = await SettingsHelper.calculateSyncHash(localRaw, options)
+                            const remoteHash = await SettingsHelper.calculateSyncHash(remoteDecrypted, options)
                             const lastSyncedHash = SettingsHelper.readLastSyncedHash(platform)
 
                             logger.log('Local Hash: ' + localHash)
@@ -85,8 +85,8 @@ class WebDav {
 
                                     if (remoteSyncConfigUpdatedAt && remoteSyncConfigUpdatedAt > localFileUpdatedAt) {
                                         logger.log('Sync direction: Cloud to Local (remote is newer).')
-                                        const merged = SettingsHelper.applyConfigFromCloud(config, platform, remoteDecrypted, options)
-                                        SettingsHelper.saveLastSyncedHash(platform, SettingsHelper.calculateSyncHash(merged, options))
+                                        const merged = await SettingsHelper.applyConfigFromCloud(config, platform, remoteDecrypted, options)
+                                        SettingsHelper.saveLastSyncedHash(platform, await SettingsHelper.calculateSyncHash(merged, options))
                                     } else {
                                         logger.log('Sync direction: Local to Cloud (local is newer or remote time unknown).')
                                         await this.syncLocalSettingsToCloud(platform, toast, options)
@@ -100,8 +100,8 @@ class WebDav {
                                 await this.syncLocalSettingsToCloud(platform, toast, options)
                             } else if (remoteHash !== lastSyncedHash && localHash === lastSyncedHash) {
                                 logger.log('Sync direction: Cloud to Local (remote changed).')
-                                const merged = SettingsHelper.applyConfigFromCloud(config, platform, remoteDecrypted, options)
-                                SettingsHelper.saveLastSyncedHash(platform, SettingsHelper.calculateSyncHash(merged, options))
+                                const merged = await SettingsHelper.applyConfigFromCloud(config, platform, remoteDecrypted, options)
+                                SettingsHelper.saveLastSyncedHash(platform, await SettingsHelper.calculateSyncHash(merged, options))
                             } else {
                                 logger.log('Conflict detected! Both local and remote changed.')
                                 const now = new Date()
@@ -188,12 +188,12 @@ class WebDav {
                     logger.log('Remote file not found for merge upload, using local-only payload.')
                 }
 
-                const uploadPayload = SettingsHelper.prepareConfigForUpload(platform, remoteDecrypted, options)
+                const uploadPayload = await SettingsHelper.prepareConfigForUpload(platform, remoteDecrypted, options)
                 await client.putFileContents(remoteFile, uploadPayload, { overwrite: true }).then(() => {
                     logger.log(CloudSyncLang.trans('sync.sync_success'))
                 })
-                const localRaw = SettingsHelper.readTabbyConfigFile(platform, true, false)
-                SettingsHelper.saveLastSyncedHash(platform, SettingsHelper.calculateSyncHash(localRaw, options))
+                const localRaw = SettingsHelper.getLocalConfigRaw(undefined, platform)
+                SettingsHelper.saveLastSyncedHash(platform, await SettingsHelper.calculateSyncHash(localRaw, options))
                 return true
             } catch (e) {
                 logger.log(CloudSyncLang.trans('log.error_upload_settings') + ' | Exception: ' + e.toString(), 'error')

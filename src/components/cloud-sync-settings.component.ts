@@ -1,5 +1,5 @@
 import { compare as semverCompare } from 'semver'
-import { Component, HostBinding, OnDestroy, OnInit } from '@angular/core'
+import { ChangeDetectorRef, Component, HostBinding, OnDestroy, OnInit } from '@angular/core'
 import { ConfigService, PlatformService, BaseComponent } from 'terminus-core'
 import { ToastrService } from 'ngx-toastr'
 import { Subscription } from 'rxjs'
@@ -38,7 +38,12 @@ export class CloudSyncSettingsComponent extends BaseComponent implements OnInit,
     storedSettingsData = null
     syncMode: SyncMode = 'platform_safe'
     syncFields = getDefaultSyncFields()
+    syncVault = false
     totalSyncFields = SYNC_FIELDS.length
+
+    get isEncryptedConfig (): boolean {
+        return !!(this.config as any).store?.encrypted
+    }
 
     private configSubscription: Subscription
 
@@ -48,6 +53,7 @@ export class CloudSyncSettingsComponent extends BaseComponent implements OnInit,
         private toast: ToastrService,
         private platform: PlatformService,
         private customFieldsDialog: CustomSyncFieldsDialogService,
+        private cdr: ChangeDetectorRef,
     ) {
         super()
     }
@@ -65,6 +71,7 @@ export class CloudSyncSettingsComponent extends BaseComponent implements OnInit,
             const syncOptions = SettingsHelper.getSyncOptions(this.platform)
             this.syncMode = syncOptions.syncMode
             this.syncFields = { ...syncOptions.syncFields }
+            this.syncVault = !!syncOptions.syncVault
         } else {
             this.selectedProvider = this.serviceProviderValues.S3
         }
@@ -77,7 +84,8 @@ export class CloudSyncSettingsComponent extends BaseComponent implements OnInit,
     }
 
     refreshLocale (): void {
-        Lang.refreshLocale(this.platform)
+        Lang.refreshLocale(this.platform, this.config)
+        this.cdr.markForCheck()
     }
 
     getCustomFieldsSummary (): string {
@@ -136,6 +144,7 @@ export class CloudSyncSettingsComponent extends BaseComponent implements OnInit,
             this.toast,
             this.syncMode,
             this.syncFields,
+            this.syncVault,
         )
         if (saved) {
             this.storedSettingsData = SettingsHelper.readConfigFile(this.platform)

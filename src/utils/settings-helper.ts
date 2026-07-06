@@ -15,10 +15,13 @@ import {
     SyncOptions,
     getDefaultSyncFields,
     resolveSyncOptions,
-    mergeForDownload,
-    mergeForUpload,
-    buildCanonicalSyncPayload,
 } from './config-merge'
+import {
+    buildCanonicalSyncPayloadAsync,
+    mergeForDownloadAsync,
+    mergeForUploadAsync,
+    SyncContext,
+} from './config-sync'
 
 const fs = require('fs')
 const path = require('path')
@@ -27,6 +30,9 @@ const CryptoJS = require('crypto-js')
 export type { SyncOptions } from './config-merge'
 
 export class SettingsHelperClass {
+    private vaultService: { getPassphrase (): Promise<string> } | null = null
+    private configService: ConfigService | null = null
+
     private adapterHandler = {
         [CloudSyncSettingsData.values.WEBDAV]: WebDav,
         [CloudSyncSettingsData.values.S3]: AmazonS3,
@@ -40,29 +46,66 @@ export class SettingsHelperClass {
     }
     private generatedCryptoHash = 'tp!&nc3^to8y7^3#4%2%&szufx!'
 
+    setVaultService (vault: { getPassphrase (): Promise<string> }): void {
+        this.vaultService = vault
+    }
+
+    setConfigService (config: ConfigService): void {
+        this.configService = config
+    }
+
     getSyncOptions (platform: PlatformService, override: SyncOptions = {}): SyncOptions {
         return resolveSyncOptions(this.readConfigFile(platform), override)
+    }
+
+    private createSyncContext (): SyncContext {
+        return {
+            getPassphrase: async () => {
+                if (this.vaultService) {
+                    return this.vaultService.getPassphrase()
+                }
+                throw new Error(CloudSyncLang.trans('sync.vault_passphrase_required'))
+            },
+        }
+    }
+
+    getLocalConfigRaw (config?: ConfigService, platform?: PlatformService): string {
+        const activeConfig = config ?? this.configService
+        if (activeConfig) {
+            return activeConfig.readRaw()
+        }
+        return this.readTabbyConfigFile(platform, true, false) || ''
     }
 
     encryptConfigContent (content: string): string {
         return CloudSyncLang.trans('common.config_inject_header') + CryptoJS.AES.encrypt(content, this.generatedCryptoHash).toString()
     }
 
-    prepareConfigForUpload (platform: PlatformService, remoteDecrypted: string | null, options: SyncOptions): string {
-        const localRaw = this.readTabbyConfigFile(platform, true, false) || ''
-        const merged = mergeForUpload(localRaw, remoteDecrypted, options)
+    async prepareConfigForUpload (
+        platform: PlatformService,
+        remoteDecrypted: string | null,
+        options: SyncOptions,
+        config?: ConfigService,
+    ): Promise<string> {
+        const localRaw = this.getLocalConfigRaw(config, platform)
+        const merged = await mergeForUploadAsync(localRaw, remoteDecrypted, options, this.createSyncContext())
         return this.encryptConfigContent(merged)
     }
 
-    applyConfigFromCloud (config: ConfigService, platform: PlatformService, remoteDecrypted: string, options: SyncOptions): string {
-        const localRaw = this.readTabbyConfigFile(platform, true, false) || ''
-        const merged = mergeForDownload(localRaw, remoteDecrypted, options)
-        config.writeRaw(merged)
+    async applyConfigFromCloud (
+        config: ConfigService,
+        platform: PlatformService,
+        remoteDecrypted: string,
+        options: SyncOptions,
+    ): Promise<string> {
+        const localRaw = this.getLocalConfigRaw(config, platform)
+        const merged = await mergeForDownloadAsync(localRaw, remoteDecrypted, options, this.createSyncContext())
+        await config.writeRaw(merged)
         return merged
     }
 
-    calculateSyncHash (content: string, options: SyncOptions): string {
-        const payload = buildCanonicalSyncPayload(content, options)
+    async calculateSyncHash (content: string, options: SyncOptions): Promise<string> {
+        const payload = await buildCanonicalSyncPayloadAsync(content, options, this.createSyncContext())
         return CryptoJS.SHA256(payload).toString()
     }
 
@@ -113,6 +156,7 @@ export class SettingsHelperClass {
         toast: ToastrService,
         syncMode: string,
         syncFields: Record<string, boolean>,
+        syncVault = false,
     ): Promise<boolean> {
         const filePath = path.dirname(platform.getConfigPath()) + CloudSyncSettingsData.storedSettingsFilename
         if (!fs.existsSync(filePath)) {
@@ -127,6 +171,7 @@ export class SettingsHelperClass {
 
         savedConfigs.syncMode = syncMode
         savedConfigs.syncFields = syncFields
+        savedConfigs.syncVault = syncVault
         delete savedConfigs.syncSections
         const fileContent = CloudSyncLang.trans('common.config_inject_header') + CryptoJS.AES.encrypt(JSON.stringify(savedConfigs), this.generatedCryptoHash).toString()
 
@@ -152,7 +197,7 @@ export class SettingsHelperClass {
         const filePath = path.dirname(platform.getConfigPath()) + CloudSyncSettingsData.tabbyLocalEncryptedFile
         const syncOptions = options ?? this.getSyncOptions(platform)
         try {
-            const tabbyConfig = this.prepareConfigForUpload(platform, remoteDecrypted, syncOptions)
+            const tabbyConfig = await this.prepareConfigForUpload(platform, remoteDecrypted, syncOptions)
             const promise = new Promise((resolve, reject) => {
                 return fs.writeFile(filePath, tabbyConfig,
                     (err) => {
