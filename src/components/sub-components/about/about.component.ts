@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core'
-import { author, support_url, github_url, version, date } from '../../../../package.json'
+import { getPluginVersion } from '../../../utils/plugin-version'
+import { author, support_url, github_url, date } from '../../../../package.json'
 import { PlatformService } from 'terminus-core'
 import CloudSyncSettingsData from '../../../data/setting-items'
 
@@ -16,7 +17,7 @@ export class CloudSyncAboutComponent implements OnInit {
         support_url: 'Plugin Page: ' + support_url,
         github_url: 'Github URL: ' + github_url,
         buy_me_a_cafe: 'Buy Me A Coffee',
-        version: 'Version: ' + version + ' - Updated date ' + date,
+        version: 'Version: ' + getPluginVersion() + ' - Updated date ' + date,
     }
 
     constructor (private platform: PlatformService) {

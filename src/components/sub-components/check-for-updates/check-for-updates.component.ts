@@ -2,7 +2,7 @@ import { Component, OnInit } from '@angular/core'
 import { ConfigService, PlatformService } from 'terminus-core'
 import { compare as semverCompare } from 'semver'
 import axios from 'axios'
-import { version } from '../../../../package.json'
+import { getPluginVersion } from '../../../utils/plugin-version'
 import Lang from '../../../data/lang'
 
 @Component({
@@ -12,7 +12,7 @@ import Lang from '../../../data/lang'
 })
 export class CheckForUpdatesComponent implements OnInit {
     translate = Lang
-    version = version
+    version = getPluginVersion()
     latestVersion = ''
     isUpdateAvailable = false
     noUpdateAvailable = false
@@ -40,7 +40,7 @@ export class CheckForUpdatesComponent implements OnInit {
                 timeout: 30000,
             })
             this.latestVersion = response.data?.version || ''
-            if (this.latestVersion && semverCompare(version, this.latestVersion) === -1) {
+            if (this.latestVersion && semverCompare(getPluginVersion(), this.latestVersion) === -1) {
                 this.isUpdateAvailable = true
             } else {
                 this.noUpdateAvailable = true

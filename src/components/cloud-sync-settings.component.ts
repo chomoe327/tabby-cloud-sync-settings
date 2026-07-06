@@ -7,7 +7,7 @@ import CloudSyncSettingsData from '../data/setting-items'
 import Lang from '../data/lang'
 import SettingsHelper from '../utils/settings-helper'
 import axios from 'axios'
-import { version } from '../../package.json'
+import { getPluginVersion } from '../utils/plugin-version'
 import devConstants from '../services/dev-constants'
 import { SYNC_FIELDS, SyncMode, countEnabledSyncFields, getDefaultSyncFields } from '../utils/config-merge'
 import { CustomSyncFieldsDialogService } from '../services/custom-sync-fields-dialog.service'
@@ -20,6 +20,7 @@ import { CustomSyncFieldsDialogService } from '../services/custom-sync-fields-di
 
 export class CloudSyncSettingsComponent extends BaseComponent implements OnInit, OnDestroy {
     lastVersion = ''
+    pluginVersion = getPluginVersion()
     translate = Lang
     isUpdateAvailable = false
     isDebug = devConstants.ENABLE_DEBUG
@@ -109,7 +110,7 @@ export class CloudSyncSettingsComponent extends BaseComponent implements OnInit,
             timeout: 30000,
         }).then((response) => {
             const latestVersion = response.data?.version
-            if (latestVersion && semverCompare(version, latestVersion) === -1) {
+            if (latestVersion && semverCompare(getPluginVersion(), latestVersion) === -1) {
                 this.isUpdateAvailable = true
                 this.lastVersion = latestVersion
             }

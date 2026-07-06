@@ -20,6 +20,13 @@ export class ChangeLogsComponent implements OnInit {
 
     entries: ChangelogEntry[] = [
         {
+            version: '1.2.4',
+            date: '2026-07-06',
+            items: [
+                { en: 'Fix version display reading from installed package.json', zh: '修复版本号显示与插件列表不一致的问题' },
+            ],
+        },
+        {
             version: '1.2.3',
             date: '2026-07-06',
             items: [

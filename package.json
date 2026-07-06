@@ -1,6 +1,6 @@
 {
   "name": "tabby-sync-selective",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "date": "6th July 2026",
   "description": "Selectively sync Tabby config across devices via WebDAV and other cloud services. Merge appearance, profiles, and more without overwriting platform-specific settings.",
   "keywords": [
@@ -15,7 +15,8 @@
     "prepublishOnly": "npm run build --mode=production",
     "lint": "eslint --ext ts */src */lib",
     "test": "jest",
-    "postbuild": "cp src/data/mockdata.json dist/src/data/mockdata.json"
+    "postbuild": "cp src/data/mockdata.json dist/src/data/mockdata.json",
+    "deploy:local-tabby": "npm run build && PLUGIN_DIR=\"$HOME/Library/Application Support/tabby/plugins/node_modules/tabby-sync-selective\" && mkdir -p \"$PLUGIN_DIR/dist\" && cp dist/index.js dist/index.js.LICENSE.txt \"$PLUGIN_DIR/dist/\" && cp package.json \"$PLUGIN_DIR/\" && rm -f \"$PLUGIN_DIR/index.js\" \"$PLUGIN_DIR/index.js.LICENSE.txt\""
   },
   "files": [
     "dist"
