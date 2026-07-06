@@ -36,14 +36,21 @@ export function wrapCloudEnvelope (
 
 export function unwrapCloudEnvelope (decrypted: string): { configYaml: string, meta: CloudSyncMeta | null } {
     const trimmed = decrypted.trim()
+    if (!trimmed) {
+        return { configYaml: '', meta: null }
+    }
     if (!trimmed.startsWith('{')) {
         return { configYaml: decrypted, meta: null }
     }
 
     try {
         const parsed = JSON.parse(trimmed) as Partial<CloudStorageEnvelope>
-        if (parsed?._meta && typeof parsed.configYaml === 'string') {
-            return { configYaml: parsed.configYaml, meta: parsed._meta as CloudSyncMeta }
+        if (typeof parsed.configYaml === 'string') {
+            const inner = parsed.configYaml.trim()
+            if (inner.startsWith('{') && inner.includes('"configYaml"')) {
+                return unwrapCloudEnvelope(parsed.configYaml)
+            }
+            return { configYaml: parsed.configYaml, meta: (parsed._meta as CloudSyncMeta) ?? null }
         }
     } catch {
         // fall through to legacy yaml

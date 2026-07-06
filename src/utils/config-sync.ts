@@ -1,15 +1,43 @@
-import * as yaml from 'js-yaml'
 import { SyncOptions } from './config-merge'
+import CloudSyncLang from '../data/lang'
 import {
+    LogicalConfig,
     PassphraseProvider,
     buildLogicalSyncPayload,
     fromLogicalConfig,
     mergeLogicalConfigs,
+    packExpandedYamlForTabby,
+    packPlainYamlForSync,
     toLogicalConfig,
 } from './config-logical'
 
 export interface SyncContext {
     getPassphrase: PassphraseProvider
+}
+
+export async function mergeForDownloadLogicalAsync (
+    localRaw: string,
+    remoteRaw: string,
+    options: SyncOptions,
+    context: SyncContext,
+): Promise<LogicalConfig> {
+    const local = await toLogicalConfig(localRaw, context.getPassphrase, options)
+    const remote = await toLogicalConfig(remoteRaw, context.getPassphrase, options)
+    const merged = mergeLogicalConfigs(local, remote, options, 'download')
+
+    const remoteKeyCount = Object.keys(remote.data).length
+    const localKeyCount = Object.keys(local.data).length
+    const mergedKeyCount = Object.keys(merged.data).length
+
+    if (mergedKeyCount === 0) {
+        throw new Error(CloudSyncLang.trans('sync.empty_merge_rejected')
+            + ` (local keys: ${localKeyCount}, remote keys: ${remoteKeyCount})`)
+    }
+
+    return {
+        ...merged,
+        encrypted: local.encrypted,
+    }
 }
 
 export async function mergeForDownloadAsync (
@@ -18,15 +46,13 @@ export async function mergeForDownloadAsync (
     options: SyncOptions,
     context: SyncContext,
 ): Promise<string> {
-    const local = await toLogicalConfig(localRaw, context.getPassphrase, options)
-    const remote = await toLogicalConfig(remoteRaw, context.getPassphrase, options)
-    const merged = mergeLogicalConfigs(local, remote, options, 'download')
+    const merged = await mergeForDownloadLogicalAsync(localRaw, remoteRaw, options, context)
 
-    if (local.encrypted) {
-        return yaml.dump({ ...merged.data, encrypted: true }, { lineWidth: -1, noRefs: true })
+    if (merged.encrypted) {
+        return packExpandedYamlForTabby(merged)
     }
 
-    return fromLogicalConfig({ ...merged, encrypted: false }, context.getPassphrase, options, false)
+    return packPlainYamlForSync(merged, context.getPassphrase, options)
 }
 
 export async function mergeForUploadAsync (

@@ -217,6 +217,10 @@ h3([textContent]='translate.trans("settings.title")')
                                 i.fas.fa-fw.fa-lock.mr-2
                                 span {{ translate.trans('sync.encrypted_config_warning') }}
 
+                            .alert.alert-warning.mt-4(*ngIf='!isEncryptedConfig && !syncVault')
+                                i.fas.fa-fw.fa-key.mr-2
+                                span {{ translate.trans('sync.keychain_password_warning') }}
+
                             .sync-vault-section.mt-4
                                 .sync-vault-row
                                     .sync-vault-label

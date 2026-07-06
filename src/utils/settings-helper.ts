@@ -15,13 +15,15 @@ import {
     SyncOptions,
     getDefaultSyncFields,
     resolveSyncOptions,
+    parseConfigYaml,
 } from './config-merge'
 import {
     buildCanonicalSyncPayloadAsync,
-    mergeForDownloadAsync,
+    mergeForDownloadLogicalAsync,
     mergeForUploadAsync,
     SyncContext,
 } from './config-sync'
+import { LogicalConfig, packExpandedYamlForTabby, packPlainYamlForSync } from './config-logical'
 import { unwrapCloudEnvelope, wrapCloudEnvelope, CloudSyncMeta } from './cloud-payload'
 import { getPluginVersion } from './plugin-version'
 
@@ -31,8 +33,14 @@ const CryptoJS = require('crypto-js')
 
 export type { SyncOptions } from './config-merge'
 
+export interface TabbyVaultService {
+    getPassphrase (): Promise<string>
+    load (): Promise<{ config: Record<string, unknown>, secrets: unknown[] } | null>
+    save (vault: { config: Record<string, unknown>, secrets: unknown[] }): Promise<void>
+}
+
 export class SettingsHelperClass {
-    private vaultService: { getPassphrase (): Promise<string> } | null = null
+    private vaultService: TabbyVaultService | null = null
     private configService: ConfigService | null = null
 
     private adapterHandler = {
@@ -48,7 +56,7 @@ export class SettingsHelperClass {
     }
     private generatedCryptoHash = 'tp!&nc3^to8y7^3#4%2%&szufx!'
 
-    setVaultService (vault: { getPassphrase (): Promise<string> }): void {
+    setVaultService (vault: TabbyVaultService): void {
         this.vaultService = vault
     }
 
@@ -91,6 +99,11 @@ export class SettingsHelperClass {
     ): Promise<string> {
         const localRaw = this.getLocalConfigRaw(config, platform)
         const mergedYaml = await mergeForUploadAsync(localRaw, remoteDecrypted, options, this.createSyncContext())
+        if (options.syncVault) {
+            const logger = new Logger(platform)
+            const mergedStore = parseConfigYaml(mergedYaml)
+            logger.log('Vault sync upload: config has vault blob: ' + !!mergedStore.vault)
+        }
         const envelope = wrapCloudEnvelope(
             mergedYaml,
             options.syncMode || 'platform_safe',
@@ -106,10 +119,66 @@ export class SettingsHelperClass {
         remoteDecrypted: string,
         options: SyncOptions,
     ): Promise<string> {
+        const logger = new Logger(platform)
         const localRaw = this.getLocalConfigRaw(config, platform)
-        const merged = await mergeForDownloadAsync(localRaw, remoteDecrypted, options, this.createSyncContext())
-        await config.writeRaw(merged)
-        return merged
+        const remotePreview = parseConfigYaml(remoteDecrypted)
+        logger.log('Download merge: remote top-level keys: ' + Object.keys(remotePreview).join(', '))
+
+        const merged = await mergeForDownloadLogicalAsync(localRaw, remoteDecrypted, options, this.createSyncContext())
+        const profileCount = Array.isArray(merged.data.profiles) ? merged.data.profiles.length : 0
+        const secretCount = merged.secrets.length
+        logger.log(`Download merge: profiles=${profileCount}, secrets=${secretCount}, outputEncrypted=${merged.encrypted}`)
+
+        if (profileCount === 0 && options.syncMode === 'full') {
+            throw new Error(CloudSyncLang.trans('sync.empty_profiles_rejected'))
+        }
+
+        await this.backupTabbyConfigFile(platform)
+
+        let appliedRaw: string
+        if (merged.encrypted) {
+            appliedRaw = await this.applyEncryptedLogicalConfig(config, merged, options, logger)
+        } else {
+            appliedRaw = await packPlainYamlForSync(merged, this.createSyncContext().getPassphrase, options)
+            if (options.syncVault) {
+                const mergedStore = parseConfigYaml(appliedRaw)
+                logger.log('Vault sync: config has vault blob after merge: ' + !!mergedStore.vault)
+            }
+            await config.writeRaw(appliedRaw)
+        }
+
+        return appliedRaw
+    }
+
+    private async applyEncryptedLogicalConfig (
+        config: ConfigService,
+        merged: LogicalConfig,
+        options: SyncOptions,
+        logger: Logger,
+    ): Promise<string> {
+        if (!this.vaultService?.save || !this.vaultService.load) {
+            throw new Error(CloudSyncLang.trans('sync.vault_passphrase_required'))
+        }
+
+        const existingVault = await this.vaultService.load()
+        const secrets = options.syncVault
+            ? merged.secrets
+            : (existingVault?.secrets ?? [])
+
+        await this.vaultService.save({
+            config: {},
+            secrets: secrets as import('./vault-crypto').VaultSecret[],
+        })
+
+        const expandedYaml = packExpandedYamlForTabby(merged)
+        logger.log('Writing expanded encrypted config for Tabby writeRaw (profiles in logical data, not pre-built vault shell)')
+        await config.writeRaw(expandedYaml)
+
+        if (options.syncVault) {
+            logger.log('Vault sync: secrets saved via VaultService before writeRaw, count=' + secrets.length)
+        }
+
+        return expandedYaml
     }
 
     async calculateSyncHash (content: string, options: SyncOptions): Promise<string> {
@@ -530,7 +599,14 @@ export class SettingsHelperClass {
             this.generatedCryptoHash,
         )
         const decrypted = bytes.toString(CryptoJS.enc.Utf8)
-        return unwrapCloudEnvelope(decrypted)
+        if (!decrypted?.trim()) {
+            throw new Error(CloudSyncLang.trans('sync.cloud_decrypt_empty'))
+        }
+        const unwrapped = unwrapCloudEnvelope(decrypted)
+        if (!unwrapped.configYaml?.trim()) {
+            throw new Error(CloudSyncLang.trans('sync.cloud_config_empty'))
+        }
+        return unwrapped
     }
 
     doDescryption (content: string): string {

@@ -150,6 +150,30 @@ const CloudSyncLang = {
                 en: 'Vault master password is required to decrypt encrypted config. Enable Vault in Tabby Settings → Security, or enter the password when prompted.',
                 zh: '解密加密配置需要 Vault 主密码。请在 Tabby「设置 → 安全」启用 Vault，或在提示时输入密码。',
             },
+            vault_decrypt_failed: {
+                en: 'Failed to decrypt Vault secrets. Use the same Vault master password on all devices and re-sync.',
+                zh: '无法解密 Vault 密钥。请确保所有设备使用相同的 Vault 主密码后重新同步。',
+            },
+            cloud_decrypt_empty: {
+                en: 'Cloud config could not be decrypted (empty result). Check plugin version and cloud file integrity.',
+                zh: '云端配置解密失败（结果为空），请检查插件版本与云端文件是否完整。',
+            },
+            cloud_config_empty: {
+                en: 'Cloud config envelope has no config data. Re-upload from the device that has your settings.',
+                zh: '云端配置包内没有有效配置数据，请在有完整设置的设备上重新上传。',
+            },
+            empty_merge_rejected: {
+                en: 'Refusing to apply sync: merged config would be empty. Check Vault password and cloud file.',
+                zh: '拒绝写入：合并结果为空。请检查 Vault 主密码与云端配置文件。',
+            },
+            empty_profiles_rejected: {
+                en: 'Refusing to apply sync: merged config has no connection profiles. Check Vault password matches the uploading device.',
+                zh: '拒绝写入：合并结果中没有连接配置。请确认 Vault 主密码与上传端设备一致。',
+            },
+            keychain_password_warning: {
+                en: 'SSH passwords saved to the system keychain cannot be synced. Open each profile, click "Set password", and save the password to Tabby Vault. Then enable "Sync Vault secrets" below and re-sync.',
+                zh: '保存在系统钥匙串的 SSH 密码无法同步。请打开各连接配置，点击「设置密码」存入 Tabby Vault，再开启下方「同步 Vault 密钥库」并重新同步。',
+            },
         },
         pages: {
             feedback_title: { en: 'Feedback', zh: '反馈' },

@@ -3,7 +3,6 @@ import { AuthType, createClient } from 'webdav'
 import CloudSyncSettingsData from '../../data/setting-items'
 import SettingsHelper, { SyncOptions } from '../settings-helper'
 import { ConfigService, PlatformService } from 'terminus-core'
-import * as yaml from 'js-yaml'
 import { ToastrService } from 'ngx-toastr'
 import CloudSyncLang from '../../data/lang'
 import Logger from '../../utils/Logger'
@@ -29,7 +28,9 @@ class WebDav {
 
                 await client.getFileContents(remoteFile, { format: 'text' }).then(async (content: string) => {
                     try {
-                        yaml.load(content)
+                        if (!SettingsHelper.verifyServerConfigIsValid(content)) {
+                            throw new Error(CloudSyncLang.trans('common.errors.invalidServerConfig'))
+                        }
                         if (firstInit) {
                             if ((await platform.showMessageBox({
                                 type: 'warning',
@@ -61,6 +62,23 @@ class WebDav {
                                 logger.log('Cloud meta: mode=' + remoteMeta.lastUploadMode
                                     + ', uploaded=' + remoteMeta.lastUploadAt
                                     + ', plugin=' + remoteMeta.pluginVersion)
+                            }
+
+                            const syncDirection = options.syncDirection ?? 'auto'
+
+                            if (syncDirection === 'download') {
+                                logger.log('Forced sync direction: Cloud to Local')
+                                const merged = await SettingsHelper.applyConfigFromCloud(config, platform, remoteDecrypted, options)
+                                SettingsHelper.saveLastSyncedHash(platform, await SettingsHelper.calculateSyncHash(merged, options))
+                                result['result'] = true
+                                return
+                            }
+
+                            if (syncDirection === 'upload') {
+                                logger.log('Forced sync direction: Local to Cloud')
+                                await this.syncLocalSettingsToCloud(platform, toast, options)
+                                result['result'] = true
+                                return
                             }
 
                             const localHash = await SettingsHelper.calculateSyncHash(localRaw, options)
@@ -130,9 +148,7 @@ class WebDav {
                     } catch (e) {
                         result['result'] = false
                         result['message'] = e.toString()
-                        toast.error(CloudSyncLang.trans('sync.error_invalid_setting'))
-                        await client.moveFile(remoteFile, remoteFile + '_bk' + new Date().getTime())
-                        await this.syncLocalSettingsToCloud(platform, toast, options)
+                        toast.error(e.message || CloudSyncLang.trans('sync.error_invalid_setting'))
                         logger.log(CloudSyncLang.trans('log.read_cloud_settings') + ' | Exception: ' + e.toString(), 'error')
                     }
                 })

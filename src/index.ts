@@ -78,35 +78,35 @@ export default class CloudSyncSettingsModule {
         private configService: ConfigService,
         private injector: Injector) {
         SettingsHelper.setConfigService(this.configService)
-        this.initVaultService()
-        this.injectLoaderIndicator()
-        SettingsHelper.loadPluginSettings(this.platform)
-        setTimeout(async () => {
-            await this.syncCloudSettings().then(() => {
-                setTimeout(() => {
-                    this.subscribeToConfigChangeEvent()
-                }, 2000)
+        void this.initVaultService().then(() => {
+            SettingsHelper.loadPluginSettings(this.platform)
+            this.injectLoaderIndicator()
+            setTimeout(async () => {
+                await this.syncCloudSettings().then(() => {
+                    setTimeout(() => {
+                        this.subscribeToConfigChangeEvent()
+                    }, 2000)
 
-                this.subscribeToAutoSyncEvent()
-            })
+                    this.subscribeToAutoSyncEvent()
+                })
+            }, 0)
         })
     }
 
-    private initVaultService (): void {
-        setTimeout(() => {
-            try {
-                // eslint-disable-next-line @typescript-eslint/no-var-requires
-                const core = require('terminus-core')
-                const vaultService = core.VaultService
-                    ? this.injector.get(core.VaultService)
-                    : null
-                if (vaultService?.getPassphrase) {
-                    SettingsHelper.setVaultService(vaultService)
-                }
-            } catch {
-                // Vault is optional until encrypted config sync is needed
+    private initVaultService (): Promise<void> {
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-var-requires
+            const core = require('terminus-core')
+            const vaultService = core.VaultService
+                ? this.injector.get(core.VaultService)
+                : null
+            if (vaultService?.getPassphrase) {
+                SettingsHelper.setVaultService(vaultService)
             }
-        }, 0)
+        } catch {
+            // Vault is optional until encrypted config / secret sync is needed
+        }
+        return Promise.resolve()
     }
 
     subscribeToAutoSyncEvent(): void {

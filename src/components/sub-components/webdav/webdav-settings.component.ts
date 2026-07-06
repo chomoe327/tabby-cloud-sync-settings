@@ -211,7 +211,10 @@ export class CloudSyncWebDavSettingsComponent implements OnInit {
         this.isSyncingProgress = true
         logger.log('Manual sync triggered: Cloud to Local')
         try {
-            await SettingsHelper.syncWithCloud(this.config, this.platform, this.toast, false, null, syncOptions).then((result) => {
+            await SettingsHelper.syncWithCloud(this.config, this.platform, this.toast, false, null, {
+                ...syncOptions,
+                syncDirection: 'download',
+            }).then((result) => {
                 const resultCheck = typeof result === 'boolean' ? result : result['result']
                 if (resultCheck) {
                     this.setFormMessage.emit({

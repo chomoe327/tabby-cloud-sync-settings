@@ -20,6 +20,40 @@ export class ChangeLogsComponent implements OnInit {
 
     entries: ChangelogEntry[] = [
         {
+            version: '1.3.4',
+            date: '2026-07-06',
+            items: [
+                { en: 'Fix encrypted config wiped on download: write expanded YAML for Tabby writeRaw instead of pre-built vault shell', zh: '修复加密配置下载后被清空：向 writeRaw 写入展开配置，而非预构建 vault 壳' },
+                { en: 'Sync Vault secrets via VaultService.save before encrypted writeRaw', zh: '加密写入前通过 VaultService.save 同步密钥' },
+                { en: 'Fix syncDirection lost in resolveSyncOptions (manual from-cloud now truly forced)', zh: '修复 syncDirection 被丢弃导致手动从云端同步未强制下载' },
+            ],
+        },
+        {
+            version: '1.3.3',
+            date: '2026-07-06',
+            items: [
+                { en: 'Manual "Sync from cloud" now always downloads (no hash/conflict override)', zh: '手动「从云端同步」改为强制下载，不再被 hash/冲突逻辑覆盖' },
+                { en: 'Reject empty merged config instead of writing defaults to disk', zh: '合并结果为空时拒绝写入，避免设置被重置为默认' },
+                { en: 'Safer cloud envelope parsing and decrypt validation', zh: '更稳健的云端包解析与解密校验' },
+            ],
+        },
+        {
+            version: '1.3.2',
+            date: '2026-07-06',
+            items: [
+                { en: 'Fix Vault empty after sync on encrypted local config (download now always writes vault blob)', zh: '修复本机加密配置下载同步后保险库为空的问题' },
+                { en: 'Restore syncVault gate: secrets load/merge/pack only when option is enabled', zh: '恢复 syncVault 门控：仅开启时才加载、合并、写入密钥' },
+                { en: 'Vault decrypt failure shows error instead of silently syncing empty vault', zh: 'Vault 解密失败会明确报错，不再静默同步出空保险库' },
+            ],
+        },
+        {
+            version: '1.3.1',
+            date: '2026-07-06',
+            items: [
+                { en: 'Warn when passwords may still be in system keychain only', zh: '提示钥匙串密码需迁移到 Vault 才能同步' },
+            ],
+        },
+        {
             version: '1.3.0',
             date: '2026-07-06',
             items: [

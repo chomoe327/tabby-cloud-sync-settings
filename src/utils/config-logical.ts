@@ -1,4 +1,5 @@
 import * as yaml from 'js-yaml'
+import CloudSyncLang from '../data/lang'
 import {
     SyncOptions,
     applyFieldsFromSource,
@@ -17,14 +18,6 @@ export interface LogicalConfig {
     configSync?: Record<string, unknown>
 }
 
-function stripStorageKeys (data: Record<string, any>): Record<string, any> {
-    const logical = { ...data }
-    delete logical.vault
-    delete logical.encrypted
-    delete logical.configSync
-    return logical
-}
-
 async function decryptVaultBlob (
     vaultBlob: unknown,
     getPassphrase: PassphraseProvider,
@@ -36,6 +29,33 @@ async function decryptVaultBlob (
     return decryptVault(vaultBlob, passphrase)
 }
 
+async function loadVaultSecrets (
+    vaultBlob: unknown,
+    getPassphrase: PassphraseProvider,
+    requireSecrets: boolean,
+): Promise<VaultSecret[]> {
+    if (!vaultBlob) {
+        return []
+    }
+    try {
+        const vault = await decryptVaultBlob(vaultBlob, getPassphrase)
+        return vault.secrets ?? []
+    } catch (error) {
+        if (requireSecrets) {
+            throw new Error(CloudSyncLang.trans('sync.vault_decrypt_failed'))
+        }
+        return []
+    }
+}
+
+function stripStorageKeys (data: Record<string, any>): Record<string, any> {
+    const logical = { ...data }
+    delete logical.vault
+    delete logical.encrypted
+    delete logical.configSync
+    return logical
+}
+
 export async function toLogicalConfig (
     rawYaml: string,
     getPassphrase: PassphraseProvider,
@@ -43,19 +63,14 @@ export async function toLogicalConfig (
 ): Promise<LogicalConfig> {
     const store = parseConfigYaml(rawYaml)
     const configSync = store.configSync
+    const requireSecrets = !!options.syncVault
     const storageOnlyKeys = new Set(['vault', 'encrypted', 'configSync'])
     const hasExpandedConfig = Object.keys(store).some(key => !storageOnlyKeys.has(key))
 
     if (isEncryptedConfig(store) && store.vault && hasExpandedConfig) {
-        let secrets: VaultSecret[] = []
-        if (options.syncVault) {
-            try {
-                const vault = await decryptVaultBlob(store.vault, getPassphrase)
-                secrets = vault.secrets ?? []
-            } catch {
-                secrets = []
-            }
-        }
+        const secrets = requireSecrets
+            ? await loadVaultSecrets(store.vault, getPassphrase, true)
+            : []
         return {
             data: stripStorageKeys({ ...store }),
             secrets,
@@ -64,28 +79,20 @@ export async function toLogicalConfig (
         }
     }
 
-    let secrets: VaultSecret[] = []
-
     if (isEncryptedConfig(store) && store.vault) {
         const vault = await decryptVaultBlob(store.vault, getPassphrase)
-        secrets = vault.secrets ?? []
         return {
             data: stripStorageKeys({ ...vault.config }),
-            secrets,
+            secrets: requireSecrets ? (vault.secrets ?? []) : [],
             encrypted: true,
             configSync,
         }
     }
 
     const logical = stripStorageKeys({ ...store })
-    if (options.syncVault && store.vault) {
-        try {
-            const vault = await decryptVaultBlob(store.vault, getPassphrase)
-            secrets = vault.secrets ?? []
-        } catch {
-            secrets = []
-        }
-    }
+    const secrets = requireSecrets
+        ? await loadVaultSecrets(store.vault, getPassphrase, true)
+        : []
 
     return {
         data: logical,
@@ -113,6 +120,23 @@ async function packEncryptedYaml (
         store.configSync = logical.configSync
     }
     return yaml.dump(store, { lineWidth: -1, noRefs: true })
+}
+
+export function packExpandedYamlForTabby (logical: LogicalConfig): string {
+    const store: Record<string, unknown> = { ...logical.data }
+    store.encrypted = true
+    if (logical.configSync !== undefined) {
+        store.configSync = logical.configSync
+    }
+    return yaml.dump(store, { lineWidth: -1, noRefs: true })
+}
+
+export async function packPlainYamlForSync (
+    logical: LogicalConfig,
+    getPassphrase: PassphraseProvider,
+    options: SyncOptions,
+): Promise<string> {
+    return packPlainYaml(logical, getPassphrase, options)
 }
 
 async function packPlainYaml (
@@ -194,5 +218,6 @@ export function mergeLogicalConfigs (
 }
 
 export function buildLogicalSyncPayload (logical: LogicalConfig, options: SyncOptions): string {
-    return buildCanonicalPayloadFromData(logical.data, options, logical.secrets)
+    const secrets = options.syncVault ? logical.secrets : undefined
+    return buildCanonicalPayloadFromData(logical.data, options, secrets)
 }

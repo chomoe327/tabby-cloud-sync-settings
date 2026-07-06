@@ -24,6 +24,8 @@ export interface SyncOptions {
     syncFields?: Record<string, boolean>
     /** Sync Tabby Vault secrets (SSH passwords, etc.) */
     syncVault?: boolean
+    /** Force sync direction; manual buttons set this, auto sync uses 'auto' */
+    syncDirection?: 'auto' | 'download' | 'upload'
     /** @deprecated use syncFields */
     syncSections?: Record<string, boolean>
 }
@@ -184,6 +186,7 @@ export function resolveSyncOptions (saved: any, override: SyncOptions = {}): Syn
         syncMode,
         syncFields,
         syncVault: override.syncVault ?? saved?.syncVault ?? false,
+        syncDirection: override.syncDirection ?? 'auto',
         ignoreEnabled: override.ignoreEnabled ?? false,
     }
 }
@@ -193,7 +196,14 @@ export function parseConfigYaml (content: string): Record<string, any> {
         return {}
     }
     const parsed = yaml.load(content)
-    return parsed && typeof parsed === 'object' ? parsed as Record<string, any> : {}
+    if (!parsed || typeof parsed !== 'object') {
+        return {}
+    }
+    const obj = parsed as Record<string, any>
+    if (typeof obj.configYaml === 'string' && obj._meta) {
+        return parseConfigYaml(obj.configYaml)
+    }
+    return obj
 }
 
 export function isEncryptedConfig (obj: Record<string, any>): boolean {
@@ -268,7 +278,7 @@ export function buildCanonicalPayloadFromData (data: Record<string, any>, option
         }
     }
 
-    if (options.syncVault && secrets?.length) {
+    if (secrets?.length) {
         payload.__secrets = secrets
     }
 
