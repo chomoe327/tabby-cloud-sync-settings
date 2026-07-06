@@ -20,6 +20,15 @@ export class ChangeLogsComponent implements OnInit {
 
     entries: ChangelogEntry[] = [
         {
+            version: '1.3.0',
+            date: '2026-07-06',
+            items: [
+                { en: 'Cross-mode sync: Full / Cross-platform / Custom share one cloud file', zh: '跨模式兼容：全量 / 跨平台 / 自定义共用一份云端配置' },
+                { en: 'Cloud payload metadata (_meta) with upload mode and timestamp', zh: '云端配置增加 _meta 元数据（上传模式、时间戳等）' },
+                { en: 'Unified per-field hash across all sync modes', zh: '统一各模式的字段级 hash 计算' },
+            ],
+        },
+        {
             version: '1.2.5',
             date: '2026-07-06',
             items: [

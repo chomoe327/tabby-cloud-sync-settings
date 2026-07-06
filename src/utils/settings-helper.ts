@@ -22,6 +22,8 @@ import {
     mergeForUploadAsync,
     SyncContext,
 } from './config-sync'
+import { unwrapCloudEnvelope, wrapCloudEnvelope, CloudSyncMeta } from './cloud-payload'
+import { getPluginVersion } from './plugin-version'
 
 const fs = require('fs')
 const path = require('path')
@@ -88,8 +90,14 @@ export class SettingsHelperClass {
         config?: ConfigService,
     ): Promise<string> {
         const localRaw = this.getLocalConfigRaw(config, platform)
-        const merged = await mergeForUploadAsync(localRaw, remoteDecrypted, options, this.createSyncContext())
-        return this.encryptConfigContent(merged)
+        const mergedYaml = await mergeForUploadAsync(localRaw, remoteDecrypted, options, this.createSyncContext())
+        const envelope = wrapCloudEnvelope(
+            mergedYaml,
+            options.syncMode || 'platform_safe',
+            getPluginVersion(),
+            options.syncVault,
+        )
+        return this.encryptConfigContent(envelope)
     }
 
     async applyConfigFromCloud (
@@ -516,9 +524,17 @@ export class SettingsHelperClass {
         fs.writeFileSync(filePath, data, 'utf8')
     }
 
+    parseCloudContent (encryptedContent: string): { configYaml: string, meta: CloudSyncMeta | null } {
+        const bytes = CryptoJS.AES.decrypt(
+            encryptedContent.replace(CloudSyncLang.trans('common.config_inject_header'), ''),
+            this.generatedCryptoHash,
+        )
+        const decrypted = bytes.toString(CryptoJS.enc.Utf8)
+        return unwrapCloudEnvelope(decrypted)
+    }
+
     doDescryption (content: string): string {
-        const bytes = CryptoJS.AES.decrypt(content.replace(CloudSyncLang.trans('common.config_inject_header'), ''), this.generatedCryptoHash)
-        return bytes.toString(CryptoJS.enc.Utf8)
+        return this.parseCloudContent(content).configYaml
     }
 
     verifyServerConfigIsValid (configRawData: string): boolean {

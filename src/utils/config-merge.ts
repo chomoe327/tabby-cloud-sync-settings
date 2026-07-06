@@ -234,7 +234,7 @@ function setValueAtPath (obj: Record<string, any>, path: string, value: any): vo
 
 function getActiveFieldDefs (options: SyncOptions): SyncFieldDef[] {
     if (options.syncMode === 'full') {
-        return []
+        return SYNC_FIELDS
     }
 
     if (options.syncMode === 'platform_safe') {
@@ -258,10 +258,6 @@ export function applyFieldsFromSource (target: Record<string, any>, source: Reco
 }
 
 export function buildCanonicalPayloadFromData (data: Record<string, any>, options: SyncOptions, secrets?: any[]): string {
-    if (options.syncMode === 'full') {
-        return JSON.stringify(data)
-    }
-
     const payload: Record<string, any> = {}
     const fields = getActiveFieldDefs(options).slice().sort((a, b) => a.id.localeCompare(b.id))
 
@@ -280,10 +276,6 @@ export function buildCanonicalPayloadFromData (data: Record<string, any>, option
 }
 
 export function buildCanonicalSyncPayload (yamlRaw: string, options: SyncOptions): string {
-    if (options.syncMode === 'full') {
-        return yamlRaw
-    }
-
     const obj = parseConfigYaml(yamlRaw)
     return buildCanonicalPayloadFromData(obj, options)
 }

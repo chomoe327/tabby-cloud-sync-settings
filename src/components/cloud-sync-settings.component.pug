@@ -205,6 +205,8 @@ h3([textContent]='translate.trans("settings.title")')
                                             strong {{ translate.trans('sync.sync_mode_custom') }}
                                             .sync-mode-desc {{ translate.trans('sync.sync_mode_custom_desc') }}
 
+                            p.text-muted.small.mt-3.mb-0 {{ translate.trans('sync.sync_mode_compat_note') }}
+
                             .custom-mode-actions(*ngIf='syncMode === "custom"')
                                 button.btn.btn-outline-primary((click)='openCustomFieldsDialog()')
                                     i.fas.fa-fw.fa-list.mr-2

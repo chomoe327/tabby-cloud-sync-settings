@@ -80,12 +80,16 @@ const CloudSyncLang = {
                 zh: '同步设置已保存。',
             },
             sync_mode_full: {
-                en: 'Full overwrite',
-                zh: '全量覆盖',
+                en: 'Full sync',
+                zh: '全量同步',
             },
             sync_mode_full_desc: {
-                en: 'Replace the entire config.yaml. Best for two machines with the same OS.',
-                zh: '整文件覆盖 config.yaml，适合两台相同系统的设备。',
+                en: 'Sync all tracked settings. Merges into the shared cloud config; other devices can still use Cross-platform or Custom.',
+                zh: '同步所有已跟踪的设置项，合并写入云端共享配置；其他设备仍可使用跨平台或自定义模式。',
+            },
+            sync_mode_compat_note: {
+                en: 'All three modes share one cloud file. Each device only reads/writes its own field subset; Full uploads do not block Cross-platform or Custom downloads.',
+                zh: '三种模式共用同一份云端配置。各设备只读写自己选中的字段；Mac 全量上传后，Windows 跨平台模式仍可正常同步。',
             },
             sync_mode_platform_safe: {
                 en: 'Cross-platform',

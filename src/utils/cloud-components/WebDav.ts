@@ -56,7 +56,12 @@ class WebDav {
                             logger.log('Remote file: ' + remoteFile)
 
                             const localRaw = SettingsHelper.getLocalConfigRaw(undefined, platform)
-                            const remoteDecrypted = SettingsHelper.doDescryption(content)
+                            const { configYaml: remoteDecrypted, meta: remoteMeta } = SettingsHelper.parseCloudContent(content)
+                            if (remoteMeta) {
+                                logger.log('Cloud meta: mode=' + remoteMeta.lastUploadMode
+                                    + ', uploaded=' + remoteMeta.lastUploadAt
+                                    + ', plugin=' + remoteMeta.pluginVersion)
+                            }
 
                             const localHash = await SettingsHelper.calculateSyncHash(localRaw, options)
                             const remoteHash = await SettingsHelper.calculateSyncHash(remoteDecrypted, options)

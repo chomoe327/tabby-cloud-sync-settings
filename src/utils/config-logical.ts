@@ -167,17 +167,16 @@ export function mergeLogicalConfigs (
     options: SyncOptions,
     direction: 'download' | 'upload',
 ): LogicalConfig {
-    if (options.syncMode === 'full') {
-        return direction === 'download'
-            ? { ...remote }
-            : { ...local }
-    }
-
     const base = direction === 'download' ? { ...local } : { ...remote }
     const source = direction === 'download' ? remote : local
 
-    const mergedData = { ...base.data }
-    applyFieldsFromSource(mergedData, source.data, options)
+    let mergedData: Record<string, any>
+    if (options.syncMode === 'full') {
+        mergedData = { ...base.data, ...source.data }
+    } else {
+        mergedData = { ...base.data }
+        applyFieldsFromSource(mergedData, source.data, options)
+    }
 
     let mergedSecrets = base.secrets
     if (options.syncVault) {

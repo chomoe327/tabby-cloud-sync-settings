@@ -18,10 +18,6 @@ export async function mergeForDownloadAsync (
     options: SyncOptions,
     context: SyncContext,
 ): Promise<string> {
-    if (options.syncMode === 'full') {
-        return remoteRaw
-    }
-
     const local = await toLogicalConfig(localRaw, context.getPassphrase, options)
     const remote = await toLogicalConfig(remoteRaw, context.getPassphrase, options)
     const merged = mergeLogicalConfigs(local, remote, options, 'download')
@@ -39,10 +35,6 @@ export async function mergeForUploadAsync (
     options: SyncOptions,
     context: SyncContext,
 ): Promise<string> {
-    if (options.syncMode === 'full') {
-        return localRaw
-    }
-
     const local = await toLogicalConfig(localRaw, context.getPassphrase, options)
     const remote = remoteRaw
         ? await toLogicalConfig(remoteRaw, context.getPassphrase, options)
@@ -58,10 +50,6 @@ export async function buildCanonicalSyncPayloadAsync (
     options: SyncOptions,
     context: SyncContext,
 ): Promise<string> {
-    if (options.syncMode === 'full') {
-        return rawYaml
-    }
-
     const logical = await toLogicalConfig(rawYaml, context.getPassphrase, options)
     return buildLogicalSyncPayload(logical, options)
 }
