@@ -1,8 +1,8 @@
 {
-  "name": "tabby-sync-kentxxq",
-  "version": "1.6.10",
-  "date": "18th March 2026",
-  "description": "Sync Tabby terminal config and connections across devices via WebDAV and other cloud services. (Fork by kentxxq)",
+  "name": "tabby-sync-selective",
+  "version": "1.1.5",
+  "date": "6th July 2026",
+  "description": "Selectively sync Tabby config across devices via WebDAV and other cloud services. Merge appearance, profiles, and more without overwriting platform-specific settings.",
   "keywords": [
     "tabby-plugin",
     "terminus-plugin"
@@ -20,9 +20,9 @@
   "files": [
     "dist"
   ],
-  "author": "kentxxq",
-  "support_url": "https://github.com/kentxxq/tabby-cloud-sync-settings",
-  "github_url": "https://github.com/kentxxq/tabby-cloud-sync-settings",
+  "author": "chomoe327",
+  "support_url": "https://github.com/chomoe327/tabby-cloud-sync-settings",
+  "github_url": "https://github.com/chomoe327/tabby-cloud-sync-settings",
   "license": "MIT",
   "devDependencies": {
     "@angular/animations": "^7.2.8",
@@ -41,13 +41,20 @@
     "aws-sdk": "niceit/aws-sdk-js",
     "axios": "^0.21.1",
     "basic-ftp": "^4.6.6",
+    "byte-length": "^1.0.2",
     "clean-webpack-plugin": "^0.1.19",
     "css-loader": "^5.1.1",
     "electron": "^14.2.7",
     "eslint": "^7.32.0",
+    "glob-to-regexp": "^0.4.1",
+    "hot-patcher": "1.0.0",
+    "isomorphic-form-data": "^2.0.0",
     "jest": "^27.0.6",
     "js-yaml": "^4.1.0",
+    "json-parse-even-better-errors": "^6.0.0",
     "keytar": "^7.6.0",
+    "md5": "^2.3.0",
+    "micromatch": "^4.0.8",
     "moment": "^2.29.3",
     "ngx-toastr": "^8.8.0",
     "pug": "^3.0.2",
@@ -61,31 +68,38 @@
     "terminus-core": "^1.0.140",
     "terminus-settings": "^1.0.140",
     "terminus-terminal": "^1.0.140",
+    "terser-webpack-plugin": "^5.6.1",
     "to-string-loader": "^1.1.6",
+    "triple-beam": "^1.4.1",
     "ts-jest": "^27.0.3",
     "ts-loader": "^9.2.3",
     "typescript": "^4.3.5",
-    "webdav": "^4.6.0",
     "webpack": "^5.88.2",
-    "webpack-cli": "^4.5.0",
-    "winston": "^3.3.3"
+    "webpack-cli": "^4.5.0"
   },
   "peerDependencies": {
     "@angular/core": "^4.0.1"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/kentxxq/tabby-cloud-sync-settings.git"
+    "url": "git+https://github.com/chomoe327/tabby-cloud-sync-settings.git"
   },
   "dependencies": {
     "crypto-js": "^4.0.0",
-    "dropbox": "^10.34.0"
+    "dropbox": "^10.34.0",
+    "webdav": "^4.6.0"
   },
   "publishConfig": {
     "registry": "https://registry.npmjs.org"
   },
   "bugs": {
-    "url": "https://github.com/kentxxq/tabby-cloud-sync-settings/issues"
+    "url": "https://github.com/chomoe327/tabby-cloud-sync-settings/issues"
   },
-  "homepage": "https://github.com/kentxxq/tabby-cloud-sync-settings"
+  "homepage": "https://github.com/chomoe327/tabby-cloud-sync-settings",
+  "pnpm": {
+    "overrides": {
+      "is-stream": "2.0.1",
+      "hot-patcher": "1.0.0"
+    }
+  }
 }

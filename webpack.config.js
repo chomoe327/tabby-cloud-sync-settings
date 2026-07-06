@@ -23,6 +23,9 @@ module.exports = {
     resolve: {
         modules: ['.', 'src', 'node_modules'].map(x => path.join(__dirname, x)),
         extensions: ['.ts', '.js'],
+        alias: {
+            'hot-patcher': path.dirname(require.resolve('hot-patcher/package.json')),
+        },
     },
     module: {
         rules: [
@@ -45,6 +48,7 @@ module.exports = {
         'keytar',
         'fs',
         'ngx-toastr',
+        'webdav',
         /^rxjs/,
         /^@angular/,
         /^@ng-bootstrap/,

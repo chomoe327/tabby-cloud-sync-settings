@@ -1,6 +1,6 @@
 // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 import CloudSyncSettingsData from '../../data/setting-items'
-import SettingsHelper from '../settings-helper'
+import SettingsHelper, { SyncOptions } from '../settings-helper'
 import { ConfigService, PlatformService } from 'terminus-core'
 import * as yaml from 'js-yaml'
 import { ToastrService } from 'ngx-toastr'
@@ -36,10 +36,11 @@ class DropboxSync {
         })
     }
 
-    async sync (config: ConfigService, platform: PlatformService, toast: ToastrService, params: any, firstInit = false, emitter: EventEmitter<any> = null) {
+    async sync (config: ConfigService, platform: PlatformService, toast: ToastrService, params: any, firstInit = false, emitter: EventEmitter<any> = null, syncOptions: SyncOptions = {}) {
         const logger = new Logger(platform)
         this._emitter = emitter
         this.internalEmitterHandler()
+        const options = SettingsHelper.getSyncOptions(platform, syncOptions)
 
         this._isFirstInit = firstInit
         const result = { result: false, message: '' }
@@ -69,12 +70,12 @@ class DropboxSync {
                             defaultId: 0,
                         })).response === 1) {
                             logger.log('First init. Sync direction: Local to Cloud.')
-                            await this.syncLocalSettingsToCloud(platform, toast)
+                            await this.syncLocalSettingsToCloud(platform, toast, options)
                         } else {
                             logger.log('First init. Sync direction: Cloud To Local.')
                             if (SettingsHelper.verifyServerConfigIsValid(content)) {
                                 await SettingsHelper.backupTabbyConfigFile(platform)
-                                config.writeRaw(SettingsHelper.doDescryption(content))
+                                SettingsHelper.applyConfigFromCloud(config, platform, SettingsHelper.doDescryption(content), options)
                                 this._emitter?.emit({
                                     action: this.emitterActions.syncComplete,
                                     result: true,
@@ -109,10 +110,10 @@ class DropboxSync {
 
                                 if (remoteSyncConfigUpdatedAt && remoteSyncConfigUpdatedAt > localFileUpdatedAt) {
                                     logger.log('Sync direction: Cloud to local.')
-                                    config.writeRaw(SettingsHelper.doDescryption(content))
+                                    SettingsHelper.applyConfigFromCloud(config, platform, SettingsHelper.doDescryption(content), options)
                                 } else {
                                     logger.log('Sync direction: Local To Cloud.')
-                                    this.syncLocalSettingsToCloud(platform, toast)
+                                    this.syncLocalSettingsToCloud(platform, toast, options)
                                 }
                             }
                         })
@@ -184,7 +185,7 @@ class DropboxSync {
                         buttons: ['Cancel', CloudSyncLang.trans('buttons.sync_from_local')],
                         defaultId: 0,
                     })).response === 1) {
-                        this.syncLocalSettingsToCloud(platform, toast)
+                        this.syncLocalSettingsToCloud(platform, toast, options)
                         result['result'] = true
                     }
                 }
@@ -197,7 +198,7 @@ class DropboxSync {
         return result
     }
 
-    async syncLocalSettingsToCloud (platform: PlatformService, toast: ToastrService) {
+    async syncLocalSettingsToCloud (platform: PlatformService, toast: ToastrService, syncOptions: SyncOptions = {}) {
         const logger = new Logger(platform)
         if (!isSyncingInProgress) {
             isSyncingInProgress = true
@@ -205,10 +206,33 @@ class DropboxSync {
             const savedConfigs = SettingsHelper.readConfigFile(platform)
             const params = savedConfigs.configs
             const remoteFile = params.location + CloudSyncSettingsData.cloudSettingsFilename
+            const options = SettingsHelper.getSyncOptions(platform, syncOptions)
 
             try {
                 const dbx = new Dropbox({ accessToken: params.accessToken })
-                dbx.filesUpload({ path: remoteFile, contents: SettingsHelper.readTabbyConfigFile(platform, true, true), mode: 'overwrite' as any })
+                let remoteDecrypted: string | null = null
+                try {
+                    const response: any = await dbx.filesDownload({ path: remoteFile })
+                    const reader = new FileReader()
+                    const blob: Blob = response.result.fileBlob
+                    remoteDecrypted = await new Promise<string>((resolve, reject) => {
+                        reader.addEventListener('loadend', () => {
+                            const content = reader.result as string
+                            if (SettingsHelper.verifyServerConfigIsValid(content)) {
+                                resolve(SettingsHelper.doDescryption(content))
+                            } else {
+                                resolve(null)
+                            }
+                        })
+                        reader.addEventListener('error', reject)
+                        reader.readAsText(blob)
+                    })
+                } catch (e) {
+                    logger.log('Remote Dropbox file not found for merge upload.')
+                }
+
+                const uploadPayload = SettingsHelper.prepareConfigForUpload(platform, remoteDecrypted, options)
+                dbx.filesUpload({ path: remoteFile, contents: uploadPayload, mode: 'overwrite' as any })
                     .then(async (response: any) => {
                         logger.log('Dropbox file upload success');
                         logger.log(JSON.stringify(response));

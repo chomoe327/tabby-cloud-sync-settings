@@ -1,186 +1,99 @@
-# Tabby Sync Cloud Settings (Fork)
+# Tabby Sync Selective
 
-本项目是 [niceit/tabby-cloud-sync-settings](https://github.com/niceit/tabby-cloud-sync-settings) 的 fork 版本。
+Tabby 云同步插件，支持**选择性同步** `config.yaml` 中的配置分区，避免 Mac / Windows 之间因热键、路径等平台相关设置互相覆盖。
 
-### 为什么会有这个 fork？
+npm 包名：**`tabby-sync-selective`**
 
-由于原仓库的 WebDAV 同步功能存在问题，本项目对其进行了修复，以确保在 Tabby 中能正常同步配置。
+## Fork 说明
 
-## 如何安装 (Installation)
+本项目 fork 自以下仓库，并在此基础上做了功能改造：
 
-由于本插件已发布至 npm，你可以直接在 Tabby 内部进行安装：
+| 上游 | 说明 |
+|------|------|
+| [niceit/tabby-cloud-sync-settings](https://github.com/niceit/tabby-cloud-sync-settings) | 最初版本（Tran IT） |
+| [kentxxq/tabby-cloud-sync-settings](https://github.com/kentxxq/tabby-cloud-sync-settings) | 社区维护 fork（npm: `tabby-sync-kentxxq`） |
 
-1. 打开 Tabby 终端。
-2. 进入 **Settings (设置)** -> **Plugins (插件)**。
-3. 在搜索框中输入 `kentxxq` 或 `tabby-sync-kentxxq`。
-4. 找到 **tabby-sync-kentxxq** 并点击 **Install (安装)**。
-5. 重启 Tabby 以使插件生效。
+**本 fork 仓库**：[chomoe327/tabby-cloud-sync-settings](https://github.com/chomoe327/tabby-cloud-sync-settings)
 
-> [!IMPORTANT]
-> **使用建议与注意事项**：
-> 1. **配置独立性**：本插件使用的配置字段与原版不同，**不会读取** `terminus-cloud-settings-sync` 的既有配置。你需要重新配置一次 WebDAV 等服务。
-> 2. **停用原版**：建议在启用本插件前，先手动**停用/禁用**原有的 `terminus-cloud-settings-sync` 插件，以确保功能正常且互不干扰。
-> 3. **版本号说明**：本插件目前设定为 `1.6.6` 版本，旨在确保能覆盖原版的同时，避免由于版本低于原版而弹出的更新提醒。如果原作者后续重新积极维护并修复了 WebDAV 问题，我们可能会考虑关闭版本检查功能或建议用户迁回。
-> 4. **关于 PR**：本项目主要是基于辅助编码（AI coding）快速修复问题的产物，未经深度重构和长时间调研，因此暂时不打算向原仓库提交 Pull Request。
+### 相对上游的主要改动
 
----
+- **新 npm 包** `tabby-sync-selective`，与 `tabby-sync-kentxxq` 独立安装，互不覆盖
+- **选择性同步**：不再整文件覆盖 `config.yaml`，按分区 merge
+  - **Cross-platform**：自动排除热键、字体、shell 路径等平台相关项
+  - **Full**：整文件覆盖（适合两台相同系统）
+  - **Custom**：40+ 细项自由勾选
+- **手动同步增强**：Sync enabled 关闭后仍可手动 from/to cloud；同步前可临时选择模式与细项
+- **WebDAV 三向 hash 对比**适配选择性同步（hash 基于参与同步的字段子集）
+- **独立配置文件名**：`tabby-sync-selective-settings.json`、`tabby-sync-selective-cloud.json` 等
+- **移除 winston 日志**，改用轻量文件日志，修复 Tabby 加载插件时的 `isStream is not a function` 崩溃
+- **修复 WebDAV 连接测试**路径拼接问题（`location` + `test.txt` → 正确目录路径）
 
-### Plugin for Tabby SSH https://github.com/Eugeny/tabby
+## 如何安装
 
-<p align="center">
-  <a href="https://github.com/kentxxq/tabby-cloud-sync-settings"><img alt="GitHub" src="https://img.shields.io/github/license/kentxxq/tabby-cloud-sync-settings"></a>
-  <img alt="GitHub stars" src="https://img.shields.io/github/stars/kentxxq/tabby-cloud-sync-settings">
-</p>
+1. 打开 Tabby → **Settings** → **Plugins**
+2. 搜索 `selective` 或 `sync-selective`
+3. 安装 **tabby-sync-selective** 并重启 Tabby
 
-使用此插件，您可以跨设备自动同步您的设置（包括保存的 SSH 会话）。
+> **重要**
+>
+> - 请勿与 `tabby-sync-kentxxq` 或原版 `terminus-cloud-settings-sync` **同时启用**
+> - 云端配置文件名已变更，WebDAV 等服务需在本插件内**重新配置**（服务器地址/账号可不变，路径如 `webdav/tabby` 保持不变）
+> - 首次同步会在云端创建 `tabby-sync-selective-cloud.json`（与旧版 `tabby-sync-kentxxq` 的云端文件名不同）
 
-Current platforms supported: **MacOS** **Windows** **Linux**
+## 选择性同步
 
-This plugin is **FREE** of use under public license MIT.
+在 **Settings → Tabby Sync Selective → General** 中可选三种模式：
 
+| 模式 | 说明 |
+|------|------|
+| **Cross-platform** | 自动屏蔽平台相关项（热键、字体、shell 路径、Electron 参数等），适合 Mac ↔ Windows |
+| **Full overwrite** | 整文件覆盖，适合两台相同系统 |
+| **Custom** | 按细项自由勾选（主题、CSS、配色、终端行为、SSH 连接等 40+ 项） |
 
-# Change logs
+手动同步时同样可在对话框中临时切换模式或调整 Custom 细项。
 
-----
+## Sync enabled 说明
 
-Keep tracking of version release change logs
+- **开启**：自动定时双向同步 + 本地配置变更自动上传
+- **关闭**：停止自动同步；**手动** from/to cloud 仍可使用
 
-## [v1.6.10] - 2026-03-18
+## WebDAV 配置提示
 
-### ✨ 功能 (Features)
-- 使用 SHA256 哈希三向对比重构 WebDAV 同步逻辑，彻底解决本地与服务器时间不一致导致的无限循环同步问题。
+| 字段 | 示例 |
+|------|------|
+| Host | `https://webdav.123pan.cn` |
+| Port | `443` |
+| Location | `webdav/tabby`（目录路径，无需末尾 `/`） |
 
-### 🐛 修复 (Fixes)
-- 增加同步冲突机制：如果遇到本地和云端都被修改的情况，会在 WebDAV 服务器端备份带时间戳的文件（`_backup_XXX`），再进行本地配置覆盖操作。
-- 添加兼容性过渡保护：初次更新插件时如果未找到本地哈希记录（`lastSyncedHash`），将回退到 mtime 时间对比机制作为唯一一次向下兼容。
+点击 **Test Connection** 会在该目录下写入并删除 `test.txt` 以验证权限。
 
-## [v1.6.9] - 2026-03-06
+## 开发与发布
 
-### 变更 (Changes)
-- 简化 README 内容，移除原项目的截图、云服务展示及捐赠链接。
-- 优化 Taskfile.yml 任务日志输出。
+```bash
+pnpm install
+pnpm run build
+pnpm publish
+```
 
-## [v1.6.8] - 2026-03-06
+## 变更日志
 
-### 修复 (Fixes)
-- 修复 `syncLocalSettingsToCloud` 中 `isSyncingInProgress` 锁不释放的 bug，使用 `try/finally` 确保锁一定被释放。
-- 当同步被跳过时（锁未释放），增加日志输出，方便排查问题。
-- 修复自动同步定时器异常中断后不再恢复的问题，确保同步周期连续运行。
-- 优化远程文件不存在时的处理逻辑，自动上传本地配置到云端而非弹出错误提示。
+### [v1.1.4] - 2026-07-06
 
-### 新增 (Features)
-- 新增 Taskfile.yml 构建配置，支持 `task build` / `task publish` 等快捷命令。
+- 修复 WebDAV 连接：`HotPatcher is not a constructor`（webdav 改为运行时依赖，不再错误打包）
+- 连接失败时在界面显示具体错误信息
 
-## [v1.6.7] - 2026-03-05
+### [v1.1.3] - 2026-07-06
 
-- 升级版本号并更新 README.md 中的安装指南与注意事项。
+- 修复 WebDAV 测试连接路径拼接
+- 更新 About 页作者与仓库链接为本 fork
 
-## [v1.6.6] - 2026-03-05
+### [v1.1.2] - 2026-07-06
 
-### 修复 (Fixes)
-- **修复 WebDAV 同步核心 bug**：将 `fs.stat` 回调方式替换为 `fs.statSync`，解决异步逻辑导致同步操作实际未执行的问题（对应 [issue #69](https://github.com/niceit/tabby-cloud-sync-settings/issues/69)）。
-- 修复 `isAbleToLoadRemoteContent` 误判逻辑，避免上传成功后仍弹出 "server has no file or the setting file is corrupted" 错误提示。
-- 替换 `node-sass` 为 `sass` (Dart Sass)，修复 macOS Apple Silicon (arm64) 上无法编译的问题。
-- 降级 `webpack` 至 `5.88.2`，修复 `CompatibilityPlugin` 解析错误。
-- 新增 `.npmrc` 配置 `shamefully-hoist=true`，兼容 pnpm 的依赖提升。
+- 移除 winston，修复插件启动崩溃
+- 锁定 `is-stream@2.0.1`
 
-### 新增 (Features)
-- 插件重命名为 `tabby-sync-kentxxq`，独立配置文件避免与原版冲突。
-- 新增手动同步按钮：支持从设置页面手动触发 "Sync from Cloud" 和 "Sync to Cloud"。
-- 增强 WebDAV 同步过程的日志输出，方便调试排查。
+### [v1.1.0] - 2026-07-06
 
-### 变更 (Changes)
-- 配置文件名更新为 `tabby-sync-kentxxq-settings.json` / `tabby-sync-kentxxq-cloud.json`。
-- 菜单标题更新为 "Tabby Sync (kentxxq)"。
-
-
-## [v1.6.5] - 2024-10-14
-
-- Dropbox official supported.
-- Plugin logs supported.
-- Optimize the sync feature.
-- Fix known bugs
-- UI Adjustments according to Tabby newer version.
-
-
-## [v1.6.0] - 2023-02-17
-
-- Fix WebDav init sync issue.
-- Improve self checking for update.
-- Add support for rollback to previous version.
-- Sponsor list added.
-- Minor bug fixes.
-
-## [v1.5.2] - 2022-11-19
-
-- Add custom config for setting interval syncing time.
-- Added Check for update tab.
-- Support check for update and inline update for the plugin.
-- Minor bug fixes.
-
-## [v1.5.1] - 2022-08-16
-
-- Inline Feedback, change logs, donate button, and more.
-- Improve UI for better user experience.
-- Minor fixes and bugs.
-
-## [v1.5.0] - 2022-07-17
-
-- Official support for **S3 Compatibility Minio, and others...**
-- Minor fixes and bugs.
-
-## [v1.4.3] - ...
-
-- Minor fixes and bugs.
-
-## [v1.4.0] - 2022-05-22
-
-- Auto sync support (Detect sync settings from other machine from cloud).
-- Critical bugs fix.
-- Minor fixes and bugs.
-
-## [v1.3.0] - 2021-12-21
-
-- Support FTP / FTPs Port setting
-- Add support for Gists (GitHub, GitLab)
-- Backup the Tabby settings for first time sync.
-- Minor fixes and bugs.
-
-## [v1.2.2] - 2021-08-24
-
-## Added
-
-- Add support for [Blackblaze B2 Storage](https://www.backblaze.com/b2/cloud-storage.html).
-
-## [v1.2.1] - 2021-08-21
-
-## Added
-
-- Add support for [Digital Ocean Space](https://www.digitalocean.com/products/spaces/).
-
-## [v1.2.0] - 2021-08-19
-
-## Added
-
-- Add support for [Wasabi Cloud Storage](https://wasabi.com/).
-
-## [v1.1.3] - 2021-08-14
-
-### Fixes
-
-- Add logger.
-- Minor fixes and bugs.
-
-## [v1.0.2] - 2021-08-07
-
-### Fixes
-
-- Optimize for security setting file encryption.
-- Fixing bugs.
-
-## [v1.0.0] - 2021-08-01
-
-### Added
-
-- Initial the plugin package
-- Added Support for Amazon S3, FTP, WebDav
+- 新插件 `tabby-sync-selective`，选择性 merge 同步
+- 手动同步分区选择对话框
+- Sync enabled 关闭后仍可手动同步

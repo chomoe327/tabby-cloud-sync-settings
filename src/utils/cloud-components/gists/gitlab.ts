@@ -7,7 +7,7 @@ import Gist from '../gist'
 import CloudSyncSettingsData from '../../../data/setting-items'
 import { ToastrService } from 'ngx-toastr'
 import { GistParams } from '../../../interface'
-import SettingsHelper from '../../settings-helper'
+import SettingsHelper, { SyncOptions } from '../../settings-helper'
 import moment from 'moment'
 import path from 'path'
 const fs = require('fs')
@@ -58,9 +58,10 @@ class Gitlab extends Gist {
         })
     }
 
-    sync = async (config: ConfigService, platform: PlatformService, toast: ToastrService, params: GistParams, firstInit = false): Promise<any> => {
+    sync = async (config: ConfigService, platform: PlatformService, toast: ToastrService, params: GistParams, firstInit = false, _emitter = null, syncOptions: SyncOptions = {}): Promise<any> => {
         const logger = new Logger(platform)
         const result = { result: false, message: '' }
+        const options = SettingsHelper.getSyncOptions(platform, syncOptions)
 
         const url = `${this.baseRequestUrl}/${params.id}/raw`
         let remoteSyncConfigUpdatedAt = null
@@ -101,11 +102,11 @@ class Gitlab extends Gist {
                     buttons: [CloudSyncLang.trans('buttons.sync_from_cloud'), CloudSyncLang.trans('buttons.sync_from_local')],
                     defaultId: 0,
                 })).response === 1) {
-                    result['result'] = await this.syncLocalSettingsToCloud(platform, toast)
+                    result['result'] = await this.syncLocalSettingsToCloud(platform, toast, options)
                 } else {
                     if (SettingsHelper.verifyServerConfigIsValid(serverTabbyContent)) {
                         await SettingsHelper.backupTabbyConfigFile(platform)
-                        config.writeRaw(SettingsHelper.doDescryption(serverTabbyContent))
+                        SettingsHelper.applyConfigFromCloud(config, platform, SettingsHelper.doDescryption(serverTabbyContent), options)
                         return true
                     } else {
                         result['result'] = false
@@ -127,10 +128,10 @@ class Gitlab extends Gist {
 
                         if (remoteSyncConfigUpdatedAt && remoteSyncConfigUpdatedAt > localFileUpdatedAt) {
                             logger.log('Sync direction: Cloud to local.')
-                            config.writeRaw(SettingsHelper.doDescryption(serverTabbyContent))
+                            SettingsHelper.applyConfigFromCloud(config, platform, SettingsHelper.doDescryption(serverTabbyContent), options)
                         } else {
                             logger.log('Sync direction: Local To Cloud.')
-                            this.syncLocalSettingsToCloud(platform, toast)
+                            this.syncLocalSettingsToCloud(platform, toast, options)
                         }
                     }
                 })
@@ -143,7 +144,7 @@ class Gitlab extends Gist {
         return result
     }
 
-    async syncLocalSettingsToCloud (platform: PlatformService, toast: ToastrService): Promise<any> {
+    async syncLocalSettingsToCloud (platform: PlatformService, toast: ToastrService, syncOptions: SyncOptions = {}): Promise<any> {
         const logger = new Logger(platform)
         let result = false
         if (!isSyncingInProgress) {
@@ -151,8 +152,25 @@ class Gitlab extends Gist {
 
             const savedConfigs = SettingsHelper.readConfigFile(platform)
             const params = savedConfigs.configs as GistParams
-            const localSettingContent = SettingsHelper.readTabbyConfigFile(platform, true, true)
+            const options = SettingsHelper.getSyncOptions(platform, syncOptions)
+            let remoteDecrypted: string | null = null
             const component = new Gitlab(params.id, params.accessToken)
+
+            try {
+                const url = `${this.baseRequestUrl}/${params.id}/raw`
+                const gistContent = await axios.get(url, {
+                    headers: {
+                        'PRIVATE-TOKEN': `${params.accessToken}`,
+                    },
+                })
+                if (SettingsHelper.verifyServerConfigIsValid(gistContent.data)) {
+                    remoteDecrypted = SettingsHelper.doDescryption(gistContent.data)
+                }
+            } catch (e) {
+                logger.log('Remote GitLab snippet not found for merge upload.')
+            }
+
+            const localSettingContent = SettingsHelper.prepareConfigForUpload(platform, remoteDecrypted, options)
 
             result = await axios.put(`${component.baseRequestUrl}/${component.id}`, {
                 gist_id: component.id,

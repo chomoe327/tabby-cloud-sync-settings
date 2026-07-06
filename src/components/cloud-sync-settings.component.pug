@@ -21,7 +21,7 @@ h3([textContent]='translate.trans("settings.title")')
     .col-md-12
         ul.nav-tabs(ngbNav, #nav='ngbNav')
             li(ngbNavItem)
-                a(ngbNavLink) General
+                a(ngbNavLink) {{ translate.trans('tabs.general') }}
                 ng-template(ngbNavContent)
                     .row.pb-1.has-border-top.mt-3
                         .col-md-12
@@ -34,7 +34,6 @@ h3([textContent]='translate.trans("settings.title")')
                                 select.form-control(
                                     [(ngModel)]='selectedProvider',
                                     (ngModelChange)='onSelectProviderChange()',
-
                                 )
                                     option(*ngFor='let item of serviceProviders', [ngValue]='item.value') {{item.name}}
 
@@ -60,8 +59,7 @@ h3([textContent]='translate.trans("settings.title")')
                                     (ngModelChange)='toggleEnableShowLoader()',
                                 )
 
-
-                            .form-line.sync-interval(style='margin-top: -25px;')
+                            .form-line.sync-interval
                                 .header
                                     .title
                                         i.fas.fa-refresh.mr-2
@@ -149,34 +147,96 @@ h3([textContent]='translate.trans("settings.title")')
 
                         cloud-sync-about
 
-            // TODO TRAN | Tobe implemented encryption with vault
-            //li(ngbNavItem)
-            //    a(ngbNavLink) Security
-            //    ng-template(ngbNavContent)
-            //        master-password-form
+            li(ngbNavItem)
+                a(ngbNavLink) {{ translate.trans('tabs.sync_settings') }}
+                ng-template(ngbNavContent)
+                    .row.pb-1.has-border-top.mt-3.pt-3
+                        .col-md-12
+                            .form-line
+                                .header
+                                    .title
+                                        i.fas.fa-fw.fa-layer-group.mr-2
+                                        span([textContent]='translate.trans("sync.sync_sections_title")')
+                                    .subtitle([textContent]='translate.trans("sync.sync_sections_hint")')
+
+                            .sync-mode-list
+                                .sync-mode-option(
+                                    [class.active]='syncMode === "platform_safe"',
+                                    (click)='onSyncModeChange("platform_safe")',
+                                )
+                                    .custom-control.custom-radio
+                                        input#syncModePlatformSafe.custom-control-input(
+                                            type='radio',
+                                            name='syncSettingsMode',
+                                            [checked]='syncMode === "platform_safe"',
+                                            (change)='onSyncModeChange("platform_safe")',
+                                        )
+                                        label.custom-control-label(for='syncModePlatformSafe')
+                                            strong {{ translate.trans('sync.sync_mode_platform_safe') }}
+                                            .sync-mode-desc {{ translate.trans('sync.sync_mode_platform_safe_desc') }}
+
+                                .sync-mode-option(
+                                    [class.active]='syncMode === "full"',
+                                    (click)='onSyncModeChange("full")',
+                                )
+                                    .custom-control.custom-radio
+                                        input#syncModeFull.custom-control-input(
+                                            type='radio',
+                                            name='syncSettingsMode',
+                                            [checked]='syncMode === "full"',
+                                            (change)='onSyncModeChange("full")',
+                                        )
+                                        label.custom-control-label(for='syncModeFull')
+                                            strong {{ translate.trans('sync.sync_mode_full') }}
+                                            .sync-mode-desc {{ translate.trans('sync.sync_mode_full_desc') }}
+
+                                .sync-mode-option(
+                                    [class.active]='syncMode === "custom"',
+                                    (click)='onSyncModeChange("custom")',
+                                )
+                                    .custom-control.custom-radio
+                                        input#syncModeCustom.custom-control-input(
+                                            type='radio',
+                                            name='syncSettingsMode',
+                                            [checked]='syncMode === "custom"',
+                                            (change)='onSyncModeChange("custom")',
+                                        )
+                                        label.custom-control-label(for='syncModeCustom')
+                                            strong {{ translate.trans('sync.sync_mode_custom') }}
+                                            .sync-mode-desc {{ translate.trans('sync.sync_mode_custom_desc') }}
+
+                            .custom-mode-actions(*ngIf='syncMode === "custom"')
+                                button.btn.btn-outline-primary((click)='openCustomFieldsDialog()')
+                                    i.fas.fa-fw.fa-list.mr-2
+                                    span {{ translate.trans('sync.configure_custom_items') }}
+                                p.text-muted.small.mt-2.mb-0 {{ getCustomFieldsSummary() }}
+
+                            button.btn.btn-primary.mt-4((click)='saveSyncSectionSettings()')
+                                i.fas.fa-fw.fa-save.mr-2
+                                span {{ translate.trans('sync.save_sync_settings') }}
 
             li(ngbNavItem)
-                a(ngbNavLink) Feedback
+                a(ngbNavLink) {{ translate.trans('tabs.feedback') }}
                 ng-template(ngbNavContent)
                     cloud-sync-feedback-form
 
             li(ngbNavItem)
-                a(ngbNavLink) Support Us
+                a(ngbNavLink) {{ translate.trans('tabs.support_us') }}
                 ng-template(ngbNavContent)
                     support-us-cloud-sync
 
             li(ngbNavItem)
-                a(ngbNavLink) Change Logs
+                a(ngbNavLink) {{ translate.trans('tabs.change_logs') }}
                 ng-template(ngbNavContent)
                     change-logs-cloud-sync
 
             li(ngbNavItem)
-                a(ngbNavLink) Check for update
+                a(ngbNavLink) {{ translate.trans('tabs.check_for_update') }}
                 ng-template(ngbNavContent)
                     check-for-updates-cloud-sync
 
             li(ngbNavItem)
-                a(ngbNavLink) Logs
+                a(ngbNavLink) {{ translate.trans('tabs.logs') }}
                 ng-template(ngbNavContent)
                     plugin-logs
 

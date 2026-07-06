@@ -1,12 +1,11 @@
 // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 import CloudSyncSettingsData from '../../data/setting-items'
-import SettingsHelper from '../settings-helper'
+import SettingsHelper, { SyncOptions } from '../settings-helper'
 import { ConfigService, PlatformService } from 'terminus-core'
 import * as yaml from 'js-yaml'
 import { ToastrService } from 'ngx-toastr'
 import CloudSyncLang from '../../data/lang'
 import { FtpParams } from '../../interface'
-import { fsReadFile } from 'ts-loader/dist/utils'
 import { Client } from 'basic-ftp'
 import Logger from '../../utils/Logger'
 import moment from 'moment'
@@ -16,9 +15,10 @@ const path = require('path')
 let isSyncingInProgress = false
 class FTP {
     private ftpClient = null
-    async sync (config: ConfigService, platform: PlatformService, toast: ToastrService, params, firstInit = false) {
+    async sync (config: ConfigService, platform: PlatformService, toast: ToastrService, params, firstInit = false, _emitter = null, syncOptions: SyncOptions = {}) {
         const logger = new Logger(platform)
         const result = { result: false, message: '' }
+        const options = SettingsHelper.getSyncOptions(platform, syncOptions)
         if (!this.ftpClient) {
             this.ftpClient = await FTP.createClient(params)
         }
@@ -31,7 +31,7 @@ class FTP {
         try {
             await client.downloadTo(tempFileLocal, remoteFile)
             if (fs.existsSync(tempFileLocal)) {
-                const content = fsReadFile(tempFileLocal, 'utf8')
+                const content = fs.readFileSync(tempFileLocal, 'utf8')
                 try {
                     yaml.load(content)
                     if (firstInit) {
@@ -41,12 +41,12 @@ class FTP {
                             buttons: [CloudSyncLang.trans('buttons.sync_from_cloud'), CloudSyncLang.trans('buttons.sync_from_local')],
                             defaultId: 0,
                         })).response === 1) {
-                            await this.uploadLocalSettings(params, client, platform, toast)
+                            await this.uploadLocalSettings(params, client, platform, toast, options)
                             result['result'] = true
                         } else {
                             if (SettingsHelper.verifyServerConfigIsValid(content)) {
                                 await SettingsHelper.backupTabbyConfigFile(platform)
-                                config.writeRaw(SettingsHelper.doDescryption(content))
+                                SettingsHelper.applyConfigFromCloud(config, platform, SettingsHelper.doDescryption(content), options)
                                 result['result'] = true
                             } else {
                                 result['result'] = false
@@ -73,10 +73,10 @@ class FTP {
 
                                     if (remoteSyncConfigUpdatedAt && remoteSyncConfigUpdatedAt > localFileUpdatedAt) {
                                         logger.log('Sync direction: Cloud to local.')
-                                        config.writeRaw(SettingsHelper.doDescryption(content))
+                                        SettingsHelper.applyConfigFromCloud(config, platform, SettingsHelper.doDescryption(content), options)
                                     } else {
                                         logger.log('Sync direction: Local To Cloud.')
-                                        this.uploadLocalSettings(params, client, platform, toast)
+                                        this.uploadLocalSettings(params, client, platform, toast, options)
                                     }
                                 }
                             })
@@ -88,17 +88,17 @@ class FTP {
                     result['message'] = e.toString()
                     toast.error(CloudSyncLang.trans('sync.error_invalid_setting'))
                     await client.rename(remoteFile, remoteFile + '_bk' + new Date().getTime())
-                    await this.uploadLocalSettings(params, client, platform, toast)
+                    await this.uploadLocalSettings(params, client, platform, toast, options)
                     logger.log(CloudSyncLang.trans('log.read_cloud_settings') + ' | Exception: ' + e.toString(), 'error')
                 }
             } else {
-                await this.uploadLocalSettings(params, client, platform, toast)
+                await this.uploadLocalSettings(params, client, platform, toast, options)
                 result['result'] = true
             }
         } catch (e) {
             logger.log(CloudSyncLang.trans('log.read_cloud_settings') + ' | Exception: ' + e.toString())
             try {
-                await this.uploadLocalSettings(params, client, platform, toast)
+                await this.uploadLocalSettings(params, client, platform, toast, options)
                 result['result'] = true
             } catch (exception) {
                 logger.log(CloudSyncLang.trans('log.error_upload_settings') + ' | Exception: ' + exception.toString(), 'error')
@@ -108,9 +108,25 @@ class FTP {
         return result
     }
 
-    private async uploadLocalSettings (params, client, platform, toast) {
+    private async uploadLocalSettings (params, client, platform, toast, syncOptions: SyncOptions = {}) {
         const remoteFile = params.location + CloudSyncSettingsData.cloudSettingsFilename
-        await SettingsHelper.generateEncryptedTabbyFileForUpload(platform).then(async status => {
+        let remoteDecrypted: string | null = null
+        const tempFileLocal = path.dirname(platform.getConfigPath()) + '/tabby-sync-remote.tmp'
+        try {
+            await client.downloadTo(tempFileLocal, remoteFile)
+            if (fs.existsSync(tempFileLocal)) {
+                const content = fs.readFileSync(tempFileLocal, 'utf8')
+                if (SettingsHelper.verifyServerConfigIsValid(content)) {
+                    remoteDecrypted = SettingsHelper.doDescryption(content)
+                }
+                fs.unlinkSync(tempFileLocal)
+            }
+        } catch (e) {
+            // remote file may not exist yet
+        }
+
+        const options = SettingsHelper.getSyncOptions(platform, syncOptions)
+        await SettingsHelper.generateEncryptedTabbyFileForUpload(platform, remoteDecrypted, options).then(async status => {
             if (status) {
                 await client.uploadFrom(path.dirname(platform.getConfigPath()) + CloudSyncSettingsData.tabbyLocalEncryptedFile, remoteFile).then(result => {
                     if (result.code !== 226) {
@@ -123,7 +139,7 @@ class FTP {
         })
     }
 
-    async syncLocalSettingsToCloud (platform: PlatformService, toast: ToastrService) {
+    async syncLocalSettingsToCloud (platform: PlatformService, toast: ToastrService, syncOptions: SyncOptions = {}) {
         const logger = new Logger(platform)
         let result = false
         if (!isSyncingInProgress) {
@@ -131,8 +147,6 @@ class FTP {
 
             const savedConfigs = SettingsHelper.readConfigFile(platform)
             const params = savedConfigs.configs
-            const localFile = path.dirname(platform.getConfigPath()) + CloudSyncSettingsData.tabbyLocalEncryptedFile
-            const remoteFile = params.location + CloudSyncSettingsData.cloudSettingsFilename
 
             if (!this.ftpClient) {
                 this.ftpClient = await FTP.createClient(params)
@@ -140,30 +154,13 @@ class FTP {
             const client: Client = this.ftpClient
 
             try {
-                await SettingsHelper.generateEncryptedTabbyFileForUpload(platform).then(async status => {
-                    if (status) {
-                        result = await client.uploadFrom(localFile, remoteFile).then(response => {
-                            if (response.code !== 226) {
-                                toast.error(CloudSyncLang.trans('sync.sync_error'))
-                                return false
-                            } else {
-                                logger.log(CloudSyncLang.trans('sync.sync_success'))
-                            }
-                            return true
-                        })
-                    } else {
-                        toast.error(CloudSyncLang.trans('sync.sync_error'))
-                        result = false
-                    }
-                })
-
+                await this.uploadLocalSettings(params, client, platform, toast, syncOptions)
+                logger.log(CloudSyncLang.trans('sync.sync_success'))
+                result = true
             } catch (e) {
                 logger.log(CloudSyncLang.trans('log.error_upload_settings') + ' | Exception: ' + e.toString(), 'error')
-                // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-                if (isSyncingInProgress) {
-                    toast.error(CloudSyncLang.trans('sync.sync_error'))
-                    result = false
-                }
+                toast.error(CloudSyncLang.trans('sync.sync_error'))
+                result = false
             }
             isSyncingInProgress = false
         }

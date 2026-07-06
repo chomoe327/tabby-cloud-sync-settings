@@ -1,5 +1,4 @@
 // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-import { fsReadFile } from 'ts-loader/dist/utils'
 import { ConfigService, PlatformService } from 'terminus-core'
 import CloudSyncSettingsData from '../data/setting-items'
 import { ToastrService } from 'ngx-toastr'
@@ -12,13 +11,20 @@ import DropboxSync from './cloud-components/Dropbox'
 import {EventEmitter} from "@angular/core";
 import Logger from "./Logger";
 import axios from "axios";
+import {
+    SyncOptions,
+    getDefaultSyncFields,
+    resolveSyncOptions,
+    mergeForDownload,
+    mergeForUpload,
+    buildCanonicalSyncPayload,
+} from './config-merge'
 
 const fs = require('fs')
 const path = require('path')
 const CryptoJS = require('crypto-js')
 
-// 用于存储上次同步成功时的 hash 值的文件名后缀
-const SYNC_HASH_FILENAME = '/tabby-sync-last-hash.json'
+export type { SyncOptions } from './config-merge'
 
 export class SettingsHelperClass {
     private adapterHandler = {
@@ -34,6 +40,32 @@ export class SettingsHelperClass {
     }
     private generatedCryptoHash = 'tp!&nc3^to8y7^3#4%2%&szufx!'
 
+    getSyncOptions (platform: PlatformService, override: SyncOptions = {}): SyncOptions {
+        return resolveSyncOptions(this.readConfigFile(platform), override)
+    }
+
+    encryptConfigContent (content: string): string {
+        return CloudSyncLang.trans('common.config_inject_header') + CryptoJS.AES.encrypt(content, this.generatedCryptoHash).toString()
+    }
+
+    prepareConfigForUpload (platform: PlatformService, remoteDecrypted: string | null, options: SyncOptions): string {
+        const localRaw = this.readTabbyConfigFile(platform, true, false) || ''
+        const merged = mergeForUpload(localRaw, remoteDecrypted, options)
+        return this.encryptConfigContent(merged)
+    }
+
+    applyConfigFromCloud (config: ConfigService, platform: PlatformService, remoteDecrypted: string, options: SyncOptions): string {
+        const localRaw = this.readTabbyConfigFile(platform, true, false) || ''
+        const merged = mergeForDownload(localRaw, remoteDecrypted, options)
+        config.writeRaw(merged)
+        return merged
+    }
+
+    calculateSyncHash (content: string, options: SyncOptions): string {
+        const payload = buildCanonicalSyncPayload(content, options)
+        return CryptoJS.SHA256(payload).toString()
+    }
+
     // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
     async saveSettingsToFile (platform: PlatformService, adapter: string, params: any): Promise<any> {
         const filePath = path.dirname(platform.getConfigPath()) + CloudSyncSettingsData.storedSettingsFilename
@@ -42,6 +74,8 @@ export class SettingsHelperClass {
             enabled: true,
             showLoader: true,
             interval_insync: CloudSyncSettingsData.defaultSyncInterval,
+            syncMode: 'platform_safe',
+            syncFields: getDefaultSyncFields(),
             configs: params,
         }
         if (fs.existsSync(filePath)) {
@@ -49,6 +83,8 @@ export class SettingsHelperClass {
             settingsArr.enabled = savedConfigs !== null ? savedConfigs['enabled'] : true
             settingsArr.showLoader = savedConfigs !== null ? savedConfigs['showLoader'] : true
             settingsArr.interval_insync = savedConfigs !== null ? savedConfigs['interval_insync'] : CloudSyncSettingsData.defaultSyncInterval
+            settingsArr.syncMode = savedConfigs?.syncMode ?? settingsArr.syncMode
+            settingsArr.syncFields = savedConfigs?.syncFields ?? savedConfigs?.syncSections ?? settingsArr.syncFields
         }
         const fileContent = CloudSyncLang.trans('common.config_inject_header') + CryptoJS.AES.encrypt(JSON.stringify(settingsArr), this.generatedCryptoHash).toString()
 
@@ -72,10 +108,51 @@ export class SettingsHelperClass {
         }
     }
 
-    async generateEncryptedTabbyFileForUpload (platform: PlatformService): Promise<any> {
-        const filePath = path.dirname(platform.getConfigPath()) + CloudSyncSettingsData.tabbyLocalEncryptedFile
+    async saveSyncSectionSettings (
+        platform: PlatformService,
+        toast: ToastrService,
+        syncMode: string,
+        syncFields: Record<string, boolean>,
+    ): Promise<boolean> {
+        const filePath = path.dirname(platform.getConfigPath()) + CloudSyncSettingsData.storedSettingsFilename
+        if (!fs.existsSync(filePath)) {
+            toast.error(CloudSyncLang.trans('sync.need_to_save_config'))
+            return false
+        }
+        const savedConfigs = this.readConfigFile(platform)
+        if (!savedConfigs) {
+            toast.error(CloudSyncLang.trans('sync.error_save_setting'))
+            return false
+        }
+
+        savedConfigs.syncMode = syncMode
+        savedConfigs.syncFields = syncFields
+        delete savedConfigs.syncSections
+        const fileContent = CloudSyncLang.trans('common.config_inject_header') + CryptoJS.AES.encrypt(JSON.stringify(savedConfigs), this.generatedCryptoHash).toString()
+
         try {
-            const tabbyConfig = this.readTabbyConfigFile(platform, true, true)
+            await new Promise((resolve, reject) => {
+                fs.writeFile(filePath, fileContent, (err) => {
+                    if (err) {
+                        reject(false)
+                    } else {
+                        resolve(true)
+                    }
+                })
+            })
+            toast.info(CloudSyncLang.trans('sync.sync_sections_saved'))
+            return true
+        } catch (e) {
+            toast.error(CloudSyncLang.trans('sync.error_save_setting'))
+            return false
+        }
+    }
+
+    async generateEncryptedTabbyFileForUpload (platform: PlatformService, remoteDecrypted: string | null = null, options: SyncOptions = null): Promise<any> {
+        const filePath = path.dirname(platform.getConfigPath()) + CloudSyncSettingsData.tabbyLocalEncryptedFile
+        const syncOptions = options ?? this.getSyncOptions(platform)
+        try {
+            const tabbyConfig = this.prepareConfigForUpload(platform, remoteDecrypted, syncOptions)
             const promise = new Promise((resolve, reject) => {
                 return fs.writeFile(filePath, tabbyConfig,
                     (err) => {
@@ -95,23 +172,31 @@ export class SettingsHelperClass {
         }
     }
 
-    async syncWithCloud (config: ConfigService, platform: PlatformService, toast: ToastrService, firstInit = false, emitter: EventEmitter<any> = null): Promise<any> {
+    async syncWithCloud (
+        config: ConfigService,
+        platform: PlatformService,
+        toast: ToastrService,
+        firstInit = false,
+        emitter: EventEmitter<any> = null,
+        syncOptions: SyncOptions = {},
+    ): Promise<any> {
         const savedConfigs = this.readConfigFile(platform)
         let result = false
         const logger = new Logger(platform)
+        const options = this.getSyncOptions(platform, syncOptions)
 
-        if (!savedConfigs.enabled) {
+        if (!savedConfigs?.enabled && !options.ignoreEnabled) {
             logger.log('Sync disabled. Skipping...')
             return false
         }
 
-        if (savedConfigs.enabled) {
+        if (savedConfigs?.enabled || options.ignoreEnabled) {
             if (CloudSyncSettingsData.isCloudStorageS3Compatibility(savedConfigs.adapter)) {
                 AmazonS3.setProvider(savedConfigs.adapter)
             }
 
             try {
-                await this.adapterHandler[savedConfigs.adapter].sync(config, platform, toast, savedConfigs.configs, firstInit, emitter).then(status => {
+                await this.adapterHandler[savedConfigs.adapter].sync(config, platform, toast, savedConfigs.configs, firstInit, emitter, options).then(status => {
                     result = status
                 })
             } catch (e) {
@@ -122,22 +207,25 @@ export class SettingsHelperClass {
         return result
     }
 
-    async syncWithCloudSettings (platform: PlatformService, toast: ToastrService): Promise<void> {
+    async syncWithCloudSettings (platform: PlatformService, toast: ToastrService, syncOptions: SyncOptions = {}): Promise<void> {
         const savedConfigs = this.readConfigFile(platform)
         if (savedConfigs) {
-            await this.adapterHandler[savedConfigs.adapter].syncLocalSettingsToCloud(platform, toast)
+            await this.adapterHandler[savedConfigs.adapter].syncLocalSettingsToCloud(platform, toast, this.getSyncOptions(platform, syncOptions))
         } else {
             toast.error(CloudSyncLang.trans('sync.error_invalid_setting_2'))
         }
     }
 
-    async syncLocalSettingsToCloud (platform: PlatformService, toast: ToastrService): Promise<void> {
+    async syncLocalSettingsToCloud (platform: PlatformService, toast: ToastrService, syncOptions: SyncOptions = {}): Promise<void> {
         const savedConfigs = this.readConfigFile(platform)
-        if (savedConfigs) {
-            await this.adapterHandler[savedConfigs.adapter].syncLocalSettingsToCloud(platform, toast)
-        } else {
+        if (!savedConfigs) {
             toast.error(CloudSyncLang.trans('sync.error_invalid_setting_2'))
+            return
         }
+        if (!savedConfigs.enabled && !syncOptions.ignoreEnabled) {
+            return
+        }
+        await this.adapterHandler[savedConfigs.adapter].syncLocalSettingsToCloud(platform, toast, this.getSyncOptions(platform, syncOptions))
     }
 
     readConfigFile (platform: PlatformService, isRaw = false): any {
@@ -145,7 +233,7 @@ export class SettingsHelperClass {
         const filePath = path.dirname(platform.getConfigPath()) + CloudSyncSettingsData.storedSettingsFilename
         if (fs.existsSync(filePath)) {
             try {
-                const bytes = CryptoJS.AES.decrypt(fsReadFile(filePath, 'utf8').replace(CloudSyncLang.trans('common.config_inject_header'), ''), this.generatedCryptoHash)
+                const bytes = CryptoJS.AES.decrypt(fs.readFileSync(filePath, 'utf8').replace(CloudSyncLang.trans('common.config_inject_header'), ''), this.generatedCryptoHash)
                 const content = bytes.toString(CryptoJS.enc.Utf8)
                 data = isRaw ? content : JSON.parse(content)
             } catch (e) {
@@ -160,9 +248,9 @@ export class SettingsHelperClass {
         const filePath = path.dirname(platform.getConfigPath()) + CloudSyncSettingsData.tabbySettingsFilename
         if (fs.existsSync(filePath)) {
             try {
-                const content = fsReadFile(filePath, 'utf8')
+                const content = fs.readFileSync(filePath, 'utf8')
                 data = isRaw
-                    ? !isEncrypt ? content : CloudSyncLang.trans('common.config_inject_header') + CryptoJS.AES.encrypt(content, this.generatedCryptoHash).toString()
+                    ? !isEncrypt ? content : this.encryptConfigContent(content)
                     : JSON.parse(content)
             } catch (e) {
             }
@@ -175,7 +263,7 @@ export class SettingsHelperClass {
         const filePath = path.dirname(platform.getConfigPath()) + CloudSyncSettingsData.tabbySettingsFilename
         if (fs.existsSync(filePath)) {
             try {
-                const content = fsReadFile(filePath, 'utf8')
+                const content = fs.readFileSync(filePath, 'utf8')
                 try {
                     const backupFilePath = path.dirname(platform.getConfigPath()) + CloudSyncSettingsData.tabbySettingsFilename + '.backup'
                     const promise = new Promise((resolve, reject) => {
@@ -360,7 +448,7 @@ export class SettingsHelperClass {
      * Read last synced hash from local storage
      */
     readLastSyncedHash (platform: PlatformService): string | null {
-        const filePath = path.dirname(platform.getConfigPath()) + SYNC_HASH_FILENAME
+        const filePath = path.dirname(platform.getConfigPath()) + CloudSyncSettingsData.syncHashFilename
         if (fs.existsSync(filePath)) {
             try {
                 const content = fs.readFileSync(filePath, 'utf8')
@@ -378,7 +466,7 @@ export class SettingsHelperClass {
      * Save last synced hash to local storage
      */
     saveLastSyncedHash (platform: PlatformService, hash: string): void {
-        const filePath = path.dirname(platform.getConfigPath()) + SYNC_HASH_FILENAME
+        const filePath = path.dirname(platform.getConfigPath()) + CloudSyncSettingsData.syncHashFilename
         const data = JSON.stringify({ lastSyncedHash: hash })
         fs.writeFileSync(filePath, data, 'utf8')
     }

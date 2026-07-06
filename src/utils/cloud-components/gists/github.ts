@@ -7,7 +7,7 @@ import Gist from '../gist'
 import CloudSyncSettingsData from '../../../data/setting-items'
 import { ToastrService } from 'ngx-toastr'
 import { GistParams } from '../../../interface'
-import SettingsHelper from '../../settings-helper'
+import SettingsHelper, { SyncOptions } from '../../settings-helper'
 import moment from 'moment'
 import path from 'path'
 const fs = require('fs')
@@ -55,7 +55,8 @@ class Github extends Gist {
         })
     }
 
-    sync = async (config: ConfigService, platform: PlatformService, toast: ToastrService, params: GistParams, firstInit = false): Promise<any> => {
+    sync = async (config: ConfigService, platform: PlatformService, toast: ToastrService, params: GistParams, firstInit = false, _emitter = null, syncOptions: SyncOptions = {}): Promise<any> => {
+        const options = SettingsHelper.getSyncOptions(platform, syncOptions)
         const logger = new Logger(platform)
         const result = { result: false, message: '' }
 
@@ -95,11 +96,11 @@ class Github extends Gist {
                     buttons: [CloudSyncLang.trans('buttons.sync_from_cloud'), CloudSyncLang.trans('buttons.sync_from_local')],
                     defaultId: 0,
                 })).response === 1) {
-                    result['result'] = await this.syncLocalSettingsToCloud(platform, toast, gistFiles)
+                    result['result'] = await this.syncLocalSettingsToCloud(platform, toast, gistFiles, options)
                 } else {
                     if (SettingsHelper.verifyServerConfigIsValid(serverTabbyContent)) {
                         await SettingsHelper.backupTabbyConfigFile(platform)
-                        config.writeRaw(SettingsHelper.doDescryption(serverTabbyContent))
+                        SettingsHelper.applyConfigFromCloud(config, platform, SettingsHelper.doDescryption(serverTabbyContent), options)
                         return true
                     } else {
                         result['result'] = false
@@ -121,10 +122,10 @@ class Github extends Gist {
 
                         if (remoteSyncConfigUpdatedAt && remoteSyncConfigUpdatedAt > localFileUpdatedAt) {
                             logger.log('Sync direction: Cloud to local.')
-                            config.writeRaw(SettingsHelper.doDescryption(serverTabbyContent))
+                            SettingsHelper.applyConfigFromCloud(config, platform, SettingsHelper.doDescryption(serverTabbyContent), options)
                         } else {
                             logger.log('Sync direction: Local To Cloud.')
-                            this.syncLocalSettingsToCloud(platform, toast, gistFiles)
+                            this.syncLocalSettingsToCloud(platform, toast, gistFiles, options)
                         }
                     }
                 })
@@ -138,7 +139,7 @@ class Github extends Gist {
     }
 
     // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-    async syncLocalSettingsToCloud (platform: PlatformService, toast: ToastrService, gistFiles: any): Promise<any> {
+    async syncLocalSettingsToCloud (platform: PlatformService, toast: ToastrService, gistFiles: any, syncOptions: SyncOptions = {}): Promise<any> {
         const logger = new Logger(platform)
         let result = false
         if (!isSyncingInProgress) {
@@ -146,7 +147,8 @@ class Github extends Gist {
 
             const savedConfigs = SettingsHelper.readConfigFile(platform)
             const params = savedConfigs.configs as GistParams
-            const localSettingContent = SettingsHelper.readTabbyConfigFile(platform, true, true)
+            const options = SettingsHelper.getSyncOptions(platform, syncOptions)
+            let remoteDecrypted: string | null = null
             const component = new Github(params.id, params.accessToken)
 
             if (!gistFiles) {
@@ -171,6 +173,13 @@ class Github extends Gist {
             }
 
             if (gistFiles) {
+                for (const idx in gistFiles) {
+                    if (SettingsHelper.verifyServerConfigIsValid(gistFiles[idx])) {
+                        remoteDecrypted = SettingsHelper.doDescryption(gistFiles[idx])
+                        break
+                    }
+                }
+                const localSettingContent = SettingsHelper.prepareConfigForUpload(platform, remoteDecrypted, options)
                 const gitFileParams = {}
                 for (const idx in gistFiles) {
                     gitFileParams[idx] = {

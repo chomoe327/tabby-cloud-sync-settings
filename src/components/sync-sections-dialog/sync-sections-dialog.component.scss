@@ -1,0 +1,36 @@
+.sync-mode-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.sync-mode-option {
+    padding: 0.65rem 0.85rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    cursor: pointer;
+
+    &.active {
+        border-color: rgba(37, 176, 155, 0.6);
+        background: rgba(37, 176, 155, 0.08);
+    }
+
+    .custom-control-label {
+        width: 100%;
+        cursor: pointer;
+    }
+}
+
+.sync-mode-desc {
+    display: block;
+    margin-top: 0.2rem;
+    font-size: 0.82rem;
+    font-weight: normal;
+    opacity: 0.75;
+}
+
+.custom-mode-actions {
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}

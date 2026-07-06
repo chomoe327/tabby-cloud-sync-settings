@@ -3,12 +3,12 @@ import { ConfigService, PlatformService } from 'terminus-core'
 import { ToastrService } from 'ngx-toastr'
 import { GistParams } from '../../../interface'
 import Github from './github'
-import SettingsHelper from '../../settings-helper'
+import SettingsHelper, { SyncOptions } from '../../settings-helper'
 import Gitee from './gitee'
 import Gitlab from './gitlab'
 
 class Gists {
-    sync = async (config: ConfigService, platform: PlatformService, toast: ToastrService, params: GistParams, firstInit = false) => {
+    sync = async (config: ConfigService, platform: PlatformService, toast: ToastrService, params: GistParams, firstInit = false, emitter = null, syncOptions: SyncOptions = {}) => {
         let $component = null
         switch (params.type) {
             case 'github': {
@@ -28,13 +28,13 @@ class Gists {
         }
 
         if ($component) {
-            return $component.sync(config, platform, toast, params, firstInit)
+            return $component.sync(config, platform, toast, params, firstInit, emitter, syncOptions)
         }
 
         return false
     }
 
-    syncLocalSettingsToCloud = async (platform: PlatformService, toast: ToastrService) => {
+    syncLocalSettingsToCloud = async (platform: PlatformService, toast: ToastrService, syncOptions: SyncOptions = {}) => {
         const configs = SettingsHelper.readConfigFile(platform).configs
         let $component = null
         switch (configs.type) {
@@ -56,9 +56,9 @@ class Gists {
 
         if ($component) {
             if (configs.type === 'gitlab') {
-                return $component.syncLocalSettingsToCloud(platform, toast)
+                return $component.syncLocalSettingsToCloud(platform, toast, syncOptions)
             } else {
-                return $component.syncLocalSettingsToCloud(platform, toast, null)
+                return $component.syncLocalSettingsToCloud(platform, toast, null, syncOptions)
             }
         }
     }

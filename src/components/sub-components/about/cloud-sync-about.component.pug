@@ -10,7 +10,7 @@
         a((click)='openGitHubUrl()', href='#')
             i.fab.fa-fw.fa-github.mr-2
             span([textContent]='info.github_url')
-    p.small.mb-0
+    p.small.mb-0(*ngIf='showDonationLink')
         a((click)='openDonationPage()', href='#')
             i.fas.fa-fw.fa-coffee.mr-2
             span([textContent]='info.buy_me_a_cafe')

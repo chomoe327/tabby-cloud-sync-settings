@@ -1,15 +1,16 @@
 import { compare as semverCompare } from 'semver'
-import { Component, HostBinding, OnInit } from '@angular/core'
+import { Component, HostBinding, OnDestroy, OnInit } from '@angular/core'
 import { ConfigService, PlatformService, BaseComponent } from 'terminus-core'
 import { ToastrService } from 'ngx-toastr'
+import { Subscription } from 'rxjs'
 import CloudSyncSettingsData from '../data/setting-items'
 import Lang from '../data/lang'
 import SettingsHelper from '../utils/settings-helper'
 import axios from 'axios'
 import { version } from '../../package.json'
 import devConstants from '../services/dev-constants'
-import { ConnectionGroup } from '../interface'
-import Logger from "../utils/Logger";
+import { SYNC_FIELDS, SyncMode, countEnabledSyncFields, getDefaultSyncFields } from '../utils/config-merge'
+import { CustomSyncFieldsDialogService } from '../services/custom-sync-fields-dialog.service'
 
 /** @hidden */
 @Component({
@@ -17,7 +18,7 @@ import Logger from "../utils/Logger";
     styles: [require('./cloud-sync-settings.component.scss')],
 })
 
-export class CloudSyncSettingsComponent extends BaseComponent implements OnInit {
+export class CloudSyncSettingsComponent extends BaseComponent implements OnInit, OnDestroy {
     lastVersion = ''
     translate = Lang
     isUpdateAvailable = false
@@ -27,19 +28,6 @@ export class CloudSyncSettingsComponent extends BaseComponent implements OnInit 
     serviceProviders = CloudSyncSettingsData.serviceProvidersList
     selectedProvider = ''
 
-    groups: ConnectionGroup[] = [
-        {
-            name: 'Exclusive Sponsor Cloud Services',
-            collapsed: true,
-            type: 'exclusive',
-        },
-        {
-            name: 'Free Cloud Services',
-            collapsed: false,
-            type: 'free',
-        },
-    ]
-
     form_messages = {
         errors: [],
         success: [],
@@ -48,18 +36,25 @@ export class CloudSyncSettingsComponent extends BaseComponent implements OnInit 
     isShowSyncLoader = true
     intervalSync = CloudSyncSettingsData.defaultSyncInterval
     storedSettingsData = null
-    form = CloudSyncSettingsData.formData
+    syncMode: SyncMode = 'platform_safe'
+    syncFields = getDefaultSyncFields()
+    totalSyncFields = SYNC_FIELDS.length
+
+    private configSubscription: Subscription
 
     @HostBinding('class.content-box') true
     constructor (
         public config: ConfigService,
         private toast: ToastrService,
-        private platform: PlatformService
+        private platform: PlatformService,
+        private customFieldsDialog: CustomSyncFieldsDialogService,
     ) {
         super()
     }
 
     ngOnInit (): void {
+        this.refreshLocale()
+        this.configSubscription = this.config.changed$.subscribe(() => this.refreshLocale())
         this.checkForNewVersion().then()
         this.storedSettingsData = SettingsHelper.readConfigFile(this.platform)
         if (this.storedSettingsData) {
@@ -67,20 +62,51 @@ export class CloudSyncSettingsComponent extends BaseComponent implements OnInit 
             this.syncEnabled = this.storedSettingsData.enabled
             this.isShowSyncLoader = !!this.storedSettingsData?.showLoader
             this.intervalSync = this.storedSettingsData?.interval_insync || CloudSyncSettingsData.defaultSyncInterval
+            const syncOptions = SettingsHelper.getSyncOptions(this.platform)
+            this.syncMode = syncOptions.syncMode
+            this.syncFields = { ...syncOptions.syncFields }
         } else {
             this.selectedProvider = this.serviceProviderValues.S3
         }
     }
 
+    ngOnDestroy (): void {
+        if (this.configSubscription) {
+            this.configSubscription.unsubscribe()
+        }
+    }
+
+    refreshLocale (): void {
+        Lang.refreshLocale(this.platform)
+    }
+
+    getCustomFieldsSummary (): string {
+        const count = countEnabledSyncFields(this.syncFields)
+        return Lang.trans('sync.custom_fields_summary', { count, total: this.totalSyncFields })
+    }
+
+    onSyncModeChange (mode: SyncMode): void {
+        this.syncMode = mode
+    }
+
+    async openCustomFieldsDialog (): Promise<void> {
+        const result = await this.customFieldsDialog.prompt(this.syncFields)
+        if (result) {
+            this.syncFields = result
+        }
+    }
+
     async checkForNewVersion (): Promise<void> {
-        await axios.get(CloudSyncSettingsData.external_urls.checkForUpdateUrl, {
+        await axios.get('https://registry.npmjs.org/tabby-sync-selective/latest', {
             timeout: 30000,
         }).then((response) => {
-            const data = response.data
-            if (semverCompare(version, data.version) === -1) {
+            const latestVersion = response.data?.version
+            if (latestVersion && semverCompare(version, latestVersion) === -1) {
                 this.isUpdateAvailable = true
-                this.lastVersion = data.version
+                this.lastVersion = latestVersion
             }
+        }).catch(() => {
+            // ignore update check failures
         })
     }
 
@@ -102,6 +128,18 @@ export class CloudSyncSettingsComponent extends BaseComponent implements OnInit 
                 this.config.requestRestart()
             }
         })
+    }
+
+    async saveSyncSectionSettings (): Promise<void> {
+        const saved = await SettingsHelper.saveSyncSectionSettings(
+            this.platform,
+            this.toast,
+            this.syncMode,
+            this.syncFields,
+        )
+        if (saved) {
+            this.storedSettingsData = SettingsHelper.readConfigFile(this.platform)
+        }
     }
 
     resetFormMessages (): void {

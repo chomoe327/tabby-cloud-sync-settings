@@ -1,69 +1,86 @@
 // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-import winston, {QueryOptions} from 'winston'
 import { PlatformService } from 'terminus-core'
-import moment from "moment";
-import fs from "fs";
+import moment from 'moment'
 
+const fs = require('fs')
 const path = require('path')
+
+interface LogEntry {
+    level: string
+    time: string
+    message: string
+}
+
 export default class Logger {
     private platform: PlatformService
-    private logger: winston.Logger
 
     constructor (platform: PlatformService) {
         this.platform = platform
-        const loggerFile = this.getCurrentLoggerFile()
+    }
 
-        this.logger  = winston.createLogger({
-            transports: [
-                new winston.transports.Console(),
-                new winston.transports.File({ filename: loggerFile }),
-            ],
-            format: winston.format.json(),
-        })
+    private getLogDir (): string {
+        return path.dirname(this.platform.getConfigPath()) + '/tabby-sync'
     }
 
     getCurrentLoggerFile (): string {
-        return path.dirname(this.platform.getConfigPath()) + '/tabby-sync/' + moment().format('DD-MM-YYYY') + '.log'
+        return this.getLogDir() + '/' + moment().format('DD-MM-YYYY') + '.log'
     }
 
-    getLogContents (callback: any, date: string = moment().format('DD-MM-YYYY'), limit = 1000): any {
-        const loggerFile =  path.dirname(this.platform.getConfigPath()) + '/tabby-sync/' + date + '.log'
+    private ensureLogDir (): void {
+        const dir = this.getLogDir()
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true })
+        }
+    }
 
-        // check if the file exists
+    getLogContents (callback: any, date: string = moment().format('DD-MM-YYYY'), limit = 1000): void {
+        const loggerFile = this.getLogDir() + '/' + date + '.log'
+
         if (!fs.existsSync(loggerFile)) {
-            return callback(new Error('Log file is not exist.'), [])
+            callback(new Error('Log file is not exist.'), { file: [] })
+            return
         }
 
-        const logger = winston.createLogger({
-            transports: [
-                new winston.transports.Console(),
-                new winston.transports.File({ filename: loggerFile }),
-            ],
-            format: winston.format.json(),
-        })
+        try {
+            const content = fs.readFileSync(loggerFile, 'utf8')
+            const lines = content.split('\n').filter((line: string) => line.trim())
+            const entries: LogEntry[] = []
 
-        const options = {
-            // @ts-ignore
-            from: moment(date, 'DD-MM-YYYY').toDate(),
-            until: moment(date, 'DD-MM-YYYY').toDate(),
-            limit: limit,
-            start: 0,
-            order: 'desc',
-            fields: ['message', 'level', 'time']
-        } as any;
+            for (const line of lines) {
+                try {
+                    entries.push(JSON.parse(line))
+                } catch (e) {
+                    // skip malformed lines
+                }
+            }
 
-        return logger.query(options , (err, result) => {
-            callback(err, result)
-        })
+            const file = entries
+                .slice(-limit)
+                .reverse()
+                .map(entry => ({
+                    level: entry.level,
+                    time: entry.time,
+                    message: entry.message,
+                }))
+
+            callback(null, { file })
+        } catch (err) {
+            callback(err, { file: [] })
+        }
     }
 
-    // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
     log (content: any, level = 'info'): void {
-        const time = new Date()
-        this.logger.log({
-            level: level,
-            time: time.toLocaleString(),
-            message: content,
-        })
+        try {
+            this.ensureLogDir()
+            const entry: LogEntry = {
+                level,
+                time: new Date().toLocaleString(),
+                message: typeof content === 'string' ? content : String(content),
+            }
+            fs.appendFileSync(this.getCurrentLoggerFile(), JSON.stringify(entry) + '\n', 'utf8')
+        } catch (e) {
+            // logging must never break plugin startup
+            console.error('[tabby-sync-selective]', content)
+        }
     }
 }

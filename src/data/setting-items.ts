@@ -34,8 +34,9 @@ const API_URL = `${DevEnv.ENABLE_DEBUG ? 'http' : 'https'}://tabby-api.tranit.${
 const CloudSyncSettingsData = {
     defaultSyncInterval: 20, // 20 seconds
     tabbySettingsFilename: '/config.yaml',
-    storedSettingsFilename: '/tabby-sync-kentxxq-settings' + (DevEnv.ENABLE_DEBUG ? '-dev' : '') + '.json',
-    cloudSettingsFilename: '/tabby-sync-kentxxq-cloud' + (DevEnv.ENABLE_DEBUG ? '-dev' : '') + '.json',
+    storedSettingsFilename: '/tabby-sync-selective-settings' + (DevEnv.ENABLE_DEBUG ? '-dev' : '') + '.json',
+    cloudSettingsFilename: '/tabby-sync-selective-cloud' + (DevEnv.ENABLE_DEBUG ? '-dev' : '') + '.json',
+    syncHashFilename: '/tabby-sync-selective-last-hash' + (DevEnv.ENABLE_DEBUG ? '-dev' : '') + '.json',
     tabbyLocalEncryptedFile: '/tabby-settings-encrypted.tmp',
     values: providerConstantItems,
     amazonEndpoints: amazonCompatibilityEndpoints,
@@ -165,6 +166,6 @@ const CloudSyncSettingsData = {
 
     },
     donationUrl: '',
-    pluginUrl: 'https://github.com/kentxxq/tabby-cloud-sync-settings',
+    pluginUrl: 'https://github.com/chomoe327/tabby-cloud-sync-settings',
 }
 export default CloudSyncSettingsData

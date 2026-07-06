@@ -1,0 +1,20 @@
+.modal-header
+    h4.modal-title {{ translate.trans('sync.custom_fields_title') }}
+    button.close(type='button', (click)='cancel()')
+        span(aria-hidden='true') &times;
+
+.modal-body
+    p.text-muted.small.mb-3 {{ translate.trans('sync.custom_fields_hint') }}
+    .sync-fields-grid
+        .sync-field-group(*ngFor='let group of fieldGroups')
+            h6.sync-field-group-title {{ getGroupLabel(group, translate.isChinese()) }}
+            .sync-field-items
+                .sync-field-item(*ngFor='let field of getFieldsByGroup(group.id)')
+                    checkbox(
+                        [(ngModel)]='syncFields[field.id]',
+                        [text]='getFieldLabel(field, translate.isChinese())',
+                    )
+
+.modal-footer
+    button.btn.btn-secondary(type='button', (click)='cancel()') {{ translate.trans('buttons.cancel') }}
+    button.btn.btn-primary(type='button', (click)='confirm()') {{ translate.trans('buttons.ok') }}

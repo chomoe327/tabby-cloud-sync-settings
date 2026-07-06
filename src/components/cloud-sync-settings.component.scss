@@ -5,6 +5,54 @@
   margin-top: -25px;
 }
 
+.sync-interval {
+  margin-top: -25px;
+}
+
+.sync-mode-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.sync-mode-option {
+  padding: 0.75rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+
+  &:hover {
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+
+  &.active {
+    border-color: rgba(37, 176, 155, 0.6);
+    background: rgba(37, 176, 155, 0.08);
+  }
+
+  .custom-control-label {
+    width: 100%;
+    cursor: pointer;
+  }
+}
+
+.sync-mode-desc {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.85rem;
+  font-weight: normal;
+  opacity: 0.75;
+}
+
+.custom-mode-actions {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+
 .tabby-sync-loading {
     position: fixed;
     z-index: 999;

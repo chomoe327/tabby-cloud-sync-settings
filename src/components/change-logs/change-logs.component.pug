@@ -1,8 +1,8 @@
 .row.pb-1.has-border-top.mt-3.pt-3
     .col-md-12
-        h3 Cloud Sync Settings Plugin Change Logs
+        h3 Tabby Sync Selective Change Logs
     .col-md-12.mb-2
-        p.mb-0 List of all changes to the cloud sync settings plugin.
+        p.mb-0 List of changes to the tabby-sync-selective plugin.
     .col-md-12
         .row
             .col-md-12
@@ -13,6 +13,26 @@
                             th Date
                             th Description
                     tbody
+                        tr
+                            td 1.1.4
+                            td 2026-07-06
+                            td
+                                p.mb-0.pb-0 Fix WebDAV HotPatcher crash by loading webdav from runtime dependency.
+                                p.mb-0.pb-0 Pin hot-patcher@1.0.0, show connection error details in UI.
+                        tr
+                            td 1.1.2
+                            td 2026-07-06
+                            td
+                                p.mb-0.pb-0 Remove winston logger to fix plugin startup crash (is-stream).
+                                p.mb-0.pb-0 Pin is-stream to v2 for compatibility.
+                        tr
+                            td 1.1.0
+                            td 2026-07-06
+                            td
+                                p.mb-0.pb-0 Selective config sync (merge by section).
+                                p.mb-0.pb-0 Manual sync section picker dialog.
+                                p.mb-0.pb-0 Manual sync works when Sync enabled is off.
+                                p.mb-0.pb-0 New npm package tabby-sync-selective.
                         tr
                             td 1.6.5
                             td 2024-10-14

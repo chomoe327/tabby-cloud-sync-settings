@@ -12,7 +12,7 @@ import { ToastrService } from 'ngx-toastr'
 import CloudSyncSettingsData from '../../data/setting-items'
 import * as yaml from 'js-yaml'
 import CloudSyncLang from '../../data/lang'
-import SettingsHelper from '../settings-helper'
+import SettingsHelper, { SyncOptions } from '../settings-helper'
 import { AmazonParams } from '../../interface'
 import Logger from '../../utils/Logger'
 import path from 'path'
@@ -86,9 +86,10 @@ class AmazonS3Class {
         return response
     }
 
-    async sync (config: ConfigService, platform: PlatformService, toast: ToastrService, params: AmazonParams, firstInit = false) {
+    async sync (config: ConfigService, platform: PlatformService, toast: ToastrService, params: AmazonParams, firstInit = false, _emitter = null, syncOptions: SyncOptions = {}) {
         const logger = new Logger(platform)
         const result = { result: false, message: '' }
+        const options = SettingsHelper.getSyncOptions(platform, syncOptions)
 
         const client = this.createClient(params, platform)
         let remoteFile = ''
@@ -103,7 +104,7 @@ class AmazonS3Class {
         const uploadObjectParams = {
             Bucket: this.bucket,
             Key: remoteFile,
-            Body: SettingsHelper.readTabbyConfigFile(platform, true, true),
+            Body: SettingsHelper.prepareConfigForUpload(platform, null, options),
             ACL: this.PERMISSIONS.PRIVATE,
             ContentType: 'application/json',
         }
@@ -130,7 +131,7 @@ class AmazonS3Class {
                         } else {
                             if (SettingsHelper.verifyServerConfigIsValid(content)) {
                                 await SettingsHelper.backupTabbyConfigFile(platform)
-                                config.writeRaw(SettingsHelper.doDescryption(content))
+                                SettingsHelper.applyConfigFromCloud(config, platform, SettingsHelper.doDescryption(content), options)
                                 result['result'] = true
                             } else {
                                 result['result'] = false
@@ -154,10 +155,10 @@ class AmazonS3Class {
 
                                 if (remoteSyncConfigUpdatedAt && remoteSyncConfigUpdatedAt > localFileUpdatedAt) {
                                     logger.log('Sync direction: Cloud to local.')
-                                    config.writeRaw(SettingsHelper.doDescryption(content))
+                                    SettingsHelper.applyConfigFromCloud(config, platform, SettingsHelper.doDescryption(content), options)
                                 } else {
                                     logger.log('Sync direction: Local To Cloud.')
-                                    this.syncLocalSettingsToCloud(platform, toast)
+                                    this.syncLocalSettingsToCloud(platform, toast, options)
                                 }
                             }
                         })
@@ -194,7 +195,7 @@ class AmazonS3Class {
         return result
     }
 
-    async syncLocalSettingsToCloud (platform: PlatformService, toast: ToastrService) {
+    async syncLocalSettingsToCloud (platform: PlatformService, toast: ToastrService, syncOptions: SyncOptions = {}) {
         const logger = new Logger(platform)
         if (!isSyncingInProgress) {
             isSyncingInProgress = true
@@ -203,6 +204,7 @@ class AmazonS3Class {
             this.setProvider(savedConfigs.adapter)
             const params = savedConfigs.configs
             const client = this.createClient(params, platform)
+            const options = SettingsHelper.getSyncOptions(platform, syncOptions)
             let remoteFile = ''
             if (this.path === '') {
                 remoteFile = CloudSyncSettingsData.cloudSettingsFilename.substr(1, CloudSyncSettingsData.cloudSettingsFilename.length)
@@ -210,11 +212,23 @@ class AmazonS3Class {
                 remoteFile = this.path + CloudSyncSettingsData.cloudSettingsFilename
             }
 
+            let remoteDecrypted: string | null = null
+            try {
+                const objectParams = { Bucket: params.bucket, Key: remoteFile }
+                const data: any = await client.getObject(objectParams).promise()
+                const content = data.Body.toString()
+                if (SettingsHelper.verifyServerConfigIsValid(content)) {
+                    remoteDecrypted = SettingsHelper.doDescryption(content)
+                }
+            } catch (e) {
+                logger.log('Remote S3 object not found for merge upload.')
+            }
+
             let response: any = {}
             const uploadObjectParams = {
                 Bucket: this.bucket,
                 Key: remoteFile,
-                Body: SettingsHelper.readTabbyConfigFile(platform, true, true),
+                Body: SettingsHelper.prepareConfigForUpload(platform, remoteDecrypted, options),
                 ACL: this.PERMISSIONS.PRIVATE,
                 ContentType: 'application/json',
             }

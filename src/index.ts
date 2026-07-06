@@ -25,6 +25,11 @@ import { CheckForUpdatesComponent } from './components/sub-components/check-for-
 import { CloudSyncDropboxSettingsComponent } from "./components/sub-components/dropbox/dropbox-settings.component";
 import Logger from "./utils/Logger";
 import { PluginLogsComponent } from "./components/sub-components/plugin-logs/plugin-logs.component";
+import { CheckboxComponent } from './components/checkbox.component'
+import { SyncSectionsDialogComponent } from './components/sync-sections-dialog/sync-sections-dialog.component'
+import { SyncSectionsDialogService } from './services/sync-sections-dialog.service'
+import { CustomSyncFieldsDialogComponent } from './components/custom-sync-fields-dialog/custom-sync-fields-dialog.component'
+import { CustomSyncFieldsDialogService } from './services/custom-sync-fields-dialog.service'
 
 let autoSynInProgress = false
 let autoSynIntervalInstance = null
@@ -38,9 +43,13 @@ let initAutoSynIntervalFrequency = CloudSyncSettingsData.defaultSyncInterval * 1
     ],
     providers: [
         { provide: SettingsTabProvider, useClass: SyncConfigSettingsTabProvider, multi: true },
+        SyncSectionsDialogService,
+        CustomSyncFieldsDialogService,
     ],
     entryComponents: [
         CloudSyncSettingsComponent,
+        SyncSectionsDialogComponent,
+        CustomSyncFieldsDialogComponent,
     ],
     declarations: [
         CloudSyncAmazonSettingsComponent,
@@ -57,6 +66,9 @@ let initAutoSynIntervalFrequency = CloudSyncSettingsData.defaultSyncInterval * 1
         CheckForUpdatesComponent,
         PluginLogsComponent,
         ToggleComponent,
+        CheckboxComponent,
+        SyncSectionsDialogComponent,
+        CustomSyncFieldsDialogComponent,
         CloudSyncDropboxSettingsComponent,
     ],
 })
@@ -91,6 +103,12 @@ export default class CloudSyncSettingsModule {
         this.configService.changed$.subscribe(async () => {
             if (autoSynInProgress) {
                 logger.log('Config changed. But auto sync is in progress. Skipping...')
+                return
+            }
+
+            const savedConfigs = SettingsHelper.readConfigFile(this.platform)
+            if (!savedConfigs?.enabled) {
+                logger.log('Config changed. Auto sync disabled. Skipping upload...')
                 return
             }
 

@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core'
 import { author, support_url, github_url, version, date } from '../../../../package.json'
 import { PlatformService } from 'terminus-core'
-import CloudSyncSettingsData from "../../../data/setting-items";
+import CloudSyncSettingsData from '../../../data/setting-items'
 
 @Component({
     selector: 'cloud-sync-about',
@@ -9,6 +9,8 @@ import CloudSyncSettingsData from "../../../data/setting-items";
     styles: [require('./cloud-sync-about.component.scss')],
 })
 export class CloudSyncAboutComponent implements OnInit {
+    showDonationLink = !!CloudSyncSettingsData.donationUrl
+
     info = {
         author: 'Author: ' + author,
         support_url: 'Plugin Page: ' + support_url,
@@ -34,6 +36,8 @@ export class CloudSyncAboutComponent implements OnInit {
     }
 
     openDonationPage (): void {
-        this.platform.openExternal(CloudSyncSettingsData.donationUrl)
+        if (CloudSyncSettingsData.donationUrl) {
+            this.platform.openExternal(CloudSyncSettingsData.donationUrl)
+        }
     }
 }

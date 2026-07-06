@@ -8,6 +8,8 @@ import { ToastrService } from 'ngx-toastr'
 import CloudSyncLang from '../../../data/lang'
 import Logger from '../../../utils/Logger'
 import WebDav from '../../../utils/cloud-components/WebDav'
+import { SyncSectionsDialogService } from '../../../services/sync-sections-dialog.service'
+import { joinCloudPath } from '../../../utils/cloud-path'
 
 interface formData {
     host: string,
@@ -36,8 +38,12 @@ export class CloudSyncWebDavSettingsComponent implements OnInit {
 
     form: formData = CloudSyncSettingsData.formData[CloudSyncSettingsData.values.WEBDAV] as formData
 
-    constructor(private config: ConfigService, private platform: PlatformService, private toast: ToastrService) {
-
+    constructor(
+        private config: ConfigService,
+        private platform: PlatformService,
+        private toast: ToastrService,
+        private syncSectionsDialog: SyncSectionsDialogService,
+    ) {
     }
 
     ngOnInit(): void {
@@ -79,20 +85,23 @@ export class CloudSyncWebDavSettingsComponent implements OnInit {
                     : this.form.location
             }
 
+            const testFile = joinCloudPath(this.form.location, 'test.txt')
+
             try {
-                await client.putFileContents(this.form.location + 'test.txt', 'Test content', { overwrite: true }).then(() => {
+                await client.putFileContents(testFile, 'Test content', { overwrite: true }).then(() => {
                     this.isFormProcessing = false
                     this.isCheckLoginSuccess = true
                     this.setFormMessage.emit({
                         message: Lang.trans('sync.setting_valid'),
                         type: 'success',
                     })
-                    client.deleteFile(this.form.location + 'test.txt')
+                    client.deleteFile(testFile)
                 })
             } catch (e) {
                 this.isFormProcessing = false
+                const detail = e && e.message ? e.message : String(e)
                 this.setFormMessage.emit({
-                    message: Lang.trans('sync.error_connection'),
+                    message: Lang.trans('sync.error_connection') + ' (' + detail + ')',
                     type: 'error',
                 })
                 logger.log(CloudSyncLang.trans('log.error_test_connection') + ' | Exception: ' + e.toString(), 'error')
@@ -194,10 +203,15 @@ export class CloudSyncWebDavSettingsComponent implements OnInit {
     async manualSyncFromCloud(): Promise<void> {
         const logger = new Logger(this.platform)
         this.resetFormMessages.emit()
+        const syncOptions = await this.syncSectionsDialog.prompt({ ignoreEnabled: true })
+        if (!syncOptions) {
+            return
+        }
+
         this.isSyncingProgress = true
         logger.log('Manual sync triggered: Cloud to Local')
         try {
-            await SettingsHelper.syncWithCloud(this.config, this.platform, this.toast, false).then((result) => {
+            await SettingsHelper.syncWithCloud(this.config, this.platform, this.toast, false, null, syncOptions).then((result) => {
                 const resultCheck = typeof result === 'boolean' ? result : result['result']
                 if (resultCheck) {
                     this.setFormMessage.emit({
@@ -205,6 +219,7 @@ export class CloudSyncWebDavSettingsComponent implements OnInit {
                         type: 'success',
                     })
                     logger.log('Manual sync from cloud completed successfully.')
+                    this.config.requestRestart()
                 } else {
                     this.setFormMessage.emit({
                         message: typeof result !== 'boolean' && result['message'] ? result['message'] : 'Sync from cloud failed.',
@@ -228,10 +243,15 @@ export class CloudSyncWebDavSettingsComponent implements OnInit {
     async manualSyncToCloud(): Promise<void> {
         const logger = new Logger(this.platform)
         this.resetFormMessages.emit()
+        const syncOptions = await this.syncSectionsDialog.prompt({ ignoreEnabled: true })
+        if (!syncOptions) {
+            return
+        }
+
         this.isSyncingProgress = true
         logger.log('Manual sync triggered: Local to Cloud')
         try {
-            await WebDav.syncLocalSettingsToCloud(this.platform, this.toast).then((result) => {
+            await WebDav.syncLocalSettingsToCloud(this.platform, this.toast, syncOptions).then((result) => {
                 if (result) {
                     this.setFormMessage.emit({
                         message: 'Local settings pushed to cloud successfully.',

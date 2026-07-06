@@ -1,0 +1,61 @@
+.modal-header
+    h4.modal-title {{ translate.trans('sync.manual_sync_title') }}
+    button.close(type='button', (click)='cancel()')
+        span(aria-hidden='true') &times;
+
+.modal-body
+    .sync-mode-list
+        .sync-mode-option(
+            [class.active]='syncMode === "platform_safe"',
+            (click)='onSyncModeChange("platform_safe")',
+        )
+            .custom-control.custom-radio
+                input#syncModePlatformSafe.custom-control-input(
+                    type='radio',
+                    name='syncMode',
+                    [checked]='syncMode === "platform_safe"',
+                    (change)='onSyncModeChange("platform_safe")',
+                )
+                label.custom-control-label(for='syncModePlatformSafe')
+                    strong {{ translate.trans('sync.sync_mode_platform_safe') }}
+                    .sync-mode-desc {{ translate.trans('sync.sync_mode_platform_safe_desc') }}
+
+        .sync-mode-option(
+            [class.active]='syncMode === "full"',
+            (click)='onSyncModeChange("full")',
+        )
+            .custom-control.custom-radio
+                input#syncModeFull.custom-control-input(
+                    type='radio',
+                    name='syncMode',
+                    [checked]='syncMode === "full"',
+                    (change)='onSyncModeChange("full")',
+                )
+                label.custom-control-label(for='syncModeFull')
+                    strong {{ translate.trans('sync.sync_mode_full') }}
+                    .sync-mode-desc {{ translate.trans('sync.sync_mode_full_desc') }}
+
+        .sync-mode-option(
+            [class.active]='syncMode === "custom"',
+            (click)='onSyncModeChange("custom")',
+        )
+            .custom-control.custom-radio
+                input#syncModeCustom.custom-control-input(
+                    type='radio',
+                    name='syncMode',
+                    [checked]='syncMode === "custom"',
+                    (change)='onSyncModeChange("custom")',
+                )
+                label.custom-control-label(for='syncModeCustom')
+                    strong {{ translate.trans('sync.sync_mode_custom') }}
+                    .sync-mode-desc {{ translate.trans('sync.sync_mode_custom_desc') }}
+
+    .custom-mode-actions(*ngIf='syncMode === "custom"')
+        button.btn.btn-outline-primary.btn-sm((click)='openCustomFieldsDialog()')
+            i.fas.fa-fw.fa-list.mr-2
+            span {{ translate.trans('sync.configure_custom_items') }}
+        p.text-muted.small.mt-2.mb-0 {{ getCustomFieldsSummary() }}
+
+.modal-footer
+    button.btn.btn-secondary(type='button', (click)='cancel()') {{ translate.trans('buttons.cancel') }}
+    button.btn.btn-primary(type='button', (click)='confirm()') {{ translate.trans('sync.manual_sync_confirm') }}

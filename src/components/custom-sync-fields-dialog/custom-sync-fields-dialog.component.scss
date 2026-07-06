@@ -1,0 +1,28 @@
+.sync-fields-grid {
+    max-height: 60vh;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.sync-field-group {
+    margin-bottom: 1rem;
+}
+
+.sync-field-group-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    opacity: 0.9;
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.25rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sync-field-items {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 0.25rem 1rem;
+}
+
+.sync-field-item {
+    min-width: 0;
+}

@@ -5,7 +5,7 @@ import { SettingsTabProvider } from 'terminus-settings'
 import CloudSyncLang from './data/lang'
 @Injectable()
 export class SyncConfigSettingsTabProvider extends SettingsTabProvider {
-    id = 'tabby-sync-kentxxq'
+    id = 'tabby-sync-selective'
     icon = 'cogs'
     title = CloudSyncLang.trans('common.menu_title')
 
